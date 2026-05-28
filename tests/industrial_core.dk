@@ -1,0 +1,334 @@
+VERSION "1.0.0" ;
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  工业级测试套件 #1: 词法分析器                             ║
+// ╚══════════════════════════════════════════════════════════╝
+
+FUNC assert | name | str | condition | bool | str | {
+    IF eq | condition | true | {
+        PRINT "[✓] " | name ;
+        RET "PASS" ;
+    } ;
+    PRINT "[✗] " | name | " FAILED!" ;
+    RET "FAIL" ;
+} ;
+
+FUNC assert_eq | name | str | actual | int | expected | int | str | {
+    VAR ok | bool ;
+    SET ok | false ;
+    IF eq | actual | expected | { SET ok | true ; } ;
+    CALL assert | name | ok ;
+    RET "OK" ;
+} ;
+
+FUNC assert_str | name | str | actual | str | expected | str | str | {
+    VAR ok | bool ;
+    SET ok | false ;
+    IF eq | actual | expected | { SET ok | true ; } ;
+    CALL assert | name | ok ;
+    RET "OK" ;
+} ;
+
+// ─── L1: 基础运算测试 ───
+FUNC test_arithmetic | str | {
+    PRINT "── L1: 算术运算 ──" ;
+
+    VAR a | int ;
+    SET a | CALC add | 3 | 5 ;
+    CALL assert_eq | "add 3+5=8" | a | 8 ;
+
+    SET a | CALC sub | 10 | 3 ;
+    CALL assert_eq | "sub 10-3=7" | a | 7 ;
+
+    SET a | CALC mul | 4 | 2 ;
+    CALL assert_eq | "mul 4*2=8" | a | 8 ;
+
+    VAR b | real ;
+    SET b | CALC div | 5 | 2 ;
+    VAR ok_ge | bool ;
+    SET ok_ge | true ;
+    IF ge | b | 2.4 | {
+        IF lt | b | 2.6 | { SET ok_ge | true ; } ;
+    } ;
+    CALL assert | "div 5/2≈2.5" | ok_ge ;
+
+    SET a | CALC mod | 10 | 3 ;
+    CALL assert_eq | "mod 10%3=1" | a | 1 ;
+
+    SET a | CALC sub | 0 | 5 ;
+    CALL assert_eq | "neg 0-5=-5" | a | -5 ;
+
+    RET "OK" ;
+} ;
+
+// ─── L2: 比较运算 ───
+FUNC test_comparison | str | {
+    PRINT "── L2: 比较运算 ──" ;
+    VAR r1 | bool ; SET r1 | CALC gt | 5 | 3 ;  CALL assert | "gt 5>3" | r1 ;
+    VAR r2 | bool ; SET r2 | CALC lt | 3 | 5 ;  CALL assert | "lt 3<5" | r2 ;
+    VAR r3 | bool ; SET r3 | CALC eq | 5 | 5 ;  CALL assert | "eq 5=5" | r3 ;
+    VAR r4 | bool ; SET r4 | CALC ne | 5 | 3 ;  CALL assert | "ne 5!=3" | r4 ;
+    VAR r5 | bool ; SET r5 | CALC ge | 5 | 3 ;  CALL assert | "ge 5>=3" | r5 ;
+    VAR r6 | bool ; SET r6 | CALC ge | 5 | 5 ;  CALL assert | "ge 5>=5" | r6 ;
+    VAR r7 | bool ; SET r7 | CALC le | 3 | 5 ;  CALL assert | "le 3<=5" | r7 ;
+    VAR r8 | bool ; SET r8 | CALC le | 5 | 5 ;  CALL assert | "le 5<=5" | r8 ;
+    RET "OK" ;
+} ;
+
+// ─── L3: 逻辑运算 ───
+FUNC test_logic | str | {
+    PRINT "── L3: 逻辑运算 ──" ;
+    VAR a | bool ; SET a | CALC AND | true | true ;  CALL assert | "AND true true" | a ;
+    VAR b | bool ; SET b | CALC AND | true | false ; CALL assert | "AND true false→false" | CALC NOT | b ;
+    VAR c | bool ; SET c | CALC OR | true | false ; CALL assert | "OR true false" | c ;
+    VAR d | bool ; SET d | CALC NOT | false ;  CALL assert | "NOT false" | d ;
+    RET "OK" ;
+} ;
+
+// ─── L4: 流程控制 ───
+FUNC test_control_flow | str | {
+    PRINT "── L4: 流程控制 ──" ;
+
+    // IF/ELSE
+    VAR x | int ;
+    SET x | 0 ;
+    IF gt | 5 | 3 | { SET x | 1 ; } ;
+    CALL assert_eq | "IF true branch" | x | 1 ;
+
+    IF lt | 5 | 3 | { SET x | 2 ; } | { SET x | 3 ; } ;
+    CALL assert_eq | "IF false→else" | x | 3 ;
+
+    // LOOP
+    VAR sum | int ;
+    SET sum | 0 ;
+    VAR i | int ;
+    LOOP i | 1 | 5 | 1 | {
+        SET sum | CALC add | sum | i ;
+    } ;
+    CALL assert_eq | "LOOP 1..5 sum=15" | sum | 15 ;
+
+    // WHILE
+    VAR n | int ;
+    SET n | 5 ;
+    VAR count | int ;
+    SET count | 0 ;
+    WHILE gt | n | 0 | {
+        SET n | CALC sub | n | 1 ;
+        SET count | CALC add | count | 1 ;
+    } ;
+    CALL assert_eq | "WHILE countdown 5→0" | count | 5 ;
+
+    // SWITCH
+    VAR day | int ;
+    SET day | 3 ;
+    VAR result | str ;
+    SET result | "none" ;
+    SWITCH day | {
+        CASE 1 | { SET result | "Mon" ; }
+        CASE 2 | { SET result | "Tue" ; }
+        CASE 3 | { SET result | "Wed" ; }
+        DEFAULT | { SET result | "Other" ; }
+    } ;
+    CALL assert_str | "SWITCH day=3→Wed" | result | "Wed" ;
+
+    // BREAK
+    VAR break_val | int ;
+    SET break_val | 0 ;
+    VAR j | int ;
+    LOOP j | 1 | 10 | 1 | {
+        IF gt | j | 5 | { BREAK ; } ;
+        SET break_val | j ;
+    } ;
+    CALL assert_eq | "BREAK at 6→val=5" | break_val | 5 ;
+
+    // NEXT
+    VAR skip_sum | int ;
+    SET skip_sum | 0 ;
+    VAR k | int ;
+    LOOP k | 1 | 5 | 1 | {
+        IF eq | k | 3 | { NEXT ; } ;
+        SET skip_sum | CALC add | skip_sum | k ;
+    } ;
+    CALL assert_eq | "NEXT skip 3→sum=1+2+4+5=12" | skip_sum | 12 ;
+
+    RET "OK" ;
+} ;
+
+// ─── L5: 字符串操作 ───
+FUNC test_strings | str | {
+    PRINT "── L5: 字符串操作 ──" ;
+
+    VAR joined | str ;
+    SET joined | STR_JOIN "-" | "a" | "b" | "c" ;
+    CALL assert_str | "STR_JOIN a-b-c" | joined | "a-b-c" ;
+
+    VAR length | int ;
+    STR_LEN length | "hello" ;
+    CALL assert_eq | "STR_LEN hello=5" | length | 5 ;
+
+    VAR cut | str ;
+    STR_CUT cut | "hello world" | 0 | 5 ;
+    CALL assert_str | "STR_CUT 0:5" | cut | "hello" ;
+
+    VAR pos | int ;
+    STR_FIND pos | "hello world" | "world" ;
+    CALL assert_eq | "STR_FIND world@6" | pos | 6 ;
+
+    VAR replaced | str ;
+    STR_REPL replaced | "hello world" | "world" | "DK" ;
+    CALL assert_str | "STR_REPL world→DK" | replaced | "hello DK" ;
+
+    RET "OK" ;
+} ;
+
+// ─── L6: 数组操作 ───
+FUNC test_arrays | str | {
+    PRINT "── L6: 数组操作 ──" ;
+
+    ARR nums | int | 10 | 20 | 30 ;
+    VAR first | int ;
+    SET first | GET nums | 0 ;
+    CALL assert_eq | "GET arr[0]=10" | first | 10 ;
+
+    PUSH nums | 40 ;
+    VAR last | int ;
+    SET last | GET nums | 3 ;
+    CALL assert_eq | "PUSH→arr[3]=40" | last | 40 ;
+
+    VAR arr_len | int ;
+    SET arr_len | ARR_LEN nums ;
+    CALL assert_eq | "ARR_LEN=4" | arr_len | 4 ;
+
+    POP nums ;
+    SET arr_len | ARR_LEN nums ;
+    CALL assert_eq | "POP→len=3" | arr_len | 3 ;
+
+    RET "OK" ;
+} ;
+
+// ─── L7: Map 操作 ───
+FUNC test_maps | str | {
+    PRINT "── L7: Map 操作 ──" ;
+
+    VAR scores | map[str,int] ;
+    SET scores | { "Alice": 95, "Bob": 87 } ;
+
+    VAR a | int ;
+    SET a | MAP_GET scores | "Alice" ;
+    CALL assert_eq | "MAP_GET Alice=95" | a | 95 ;
+
+    MAP_SET scores | "Bob" | 90 ;
+    VAR b | int ;
+    SET b | MAP_GET scores | "Bob" ;
+    CALL assert_eq | "MAP_SET Bob→90" | b | 90 ;
+
+    VAR has_a | bool ;
+    MAP_HAS has_a | scores | "Alice" ;
+    CALL assert | "MAP_HAS Alice=true" | has_a ;
+
+    MAP_DEL scores | "Alice" ;
+    VAR has_a2 | bool ;
+    MAP_HAS has_a2 | scores | "Alice" ;
+    CALL assert | "MAP_DEL→MAP_HAS=false" | CALC NOT | has_a2 ;
+
+    RET "OK" ;
+} ;
+
+// ─── L8: 函数与递归 ───
+FUNC factorial | n | int | int | {
+    IF le | n | 1 | { RET 1 ; } ;
+    RET CALC mul | n | CALL factorial | CALC sub | n | 1 ;
+} ;
+
+FUNC test_functions | str | {
+    PRINT "── L8: 函数与递归 ──" ;
+
+    VAR f5 | int ;
+    SET f5 | CALL factorial | 5 ;
+    CALL assert_eq | "factorial(5)=120" | f5 | 120 ;
+
+    VAR f0 | int ;
+    SET f0 | CALL factorial | 0 ;
+    CALL assert_eq | "factorial(0)=1" | f0 | 1 ;
+
+    VAR f1 | int ;
+    SET f1 | CALL factorial | 1 ;
+    CALL assert_eq | "factorial(1)=1" | f1 | 1 ;
+
+    RET "OK" ;
+} ;
+
+// ─── L9: TRY/CATCH ───
+FUNC test_error_handling | str | {
+    PRINT "── L9: 错误处理 ──" ;
+
+    VAR caught | bool ;
+    SET caught | false ;
+    TRY | {
+        VAR bad | int ;
+        SET bad | CALC div | 1 | 0 ;
+    } CATCH "ArithError" | {
+        SET caught | true ;
+    } ;
+    CALL assert | "CATCH div by zero" | caught ;
+
+    // IndexError
+    SET caught | false ;
+    ARR small | int | 1 ;
+    TRY | {
+        VAR bad | int ;
+        SET bad | GET small | 99 ;
+    } CATCH "Error" | {
+        SET caught | true ;
+    } ;
+    CALL assert | "CATCH IndexError" | caught ;
+
+    RET "OK" ;
+} ;
+
+// ─── L10: 类型转换 ───
+FUNC test_type_conversion | str | {
+    PRINT "── L10: 类型转换 ──" ;
+
+    VAR pi | real ;
+    SET pi | 3.14 ;
+    VAR pi_int | int ;
+    SET pi_int | AS(pi, int) ;
+    CALL assert_eq | "AS(3.14,int)=3" | pi_int | 3 ;
+
+    VAR str_num | str ;
+    SET str_num | "42" ;
+    VAR parsed | int ;
+    SET parsed | AS(str_num, int) ;
+    CALL assert_eq | "AS('42',int)=42" | parsed | 42 ;
+
+    RET "OK" ;
+} ;
+
+// ─── 主入口 ───
+FUNC main | str | {
+    PRINT "" ;
+    PRINT "══════════════════════════════════════" ;
+    PRINT "  工业级测试套件 #1: 核心语言特性" ;
+    PRINT "══════════════════════════════════════" ;
+    PRINT "" ;
+
+    CALL test_arithmetic ;
+    CALL test_comparison ;
+    CALL test_logic ;
+    CALL test_control_flow ;
+    CALL test_strings ;
+    CALL test_arrays ;
+    CALL test_maps ;
+    CALL test_functions ;
+    CALL test_error_handling ;
+    CALL test_type_conversion ;
+
+    PRINT "" ;
+    PRINT "══════════════════════════════════════" ;
+    PRINT "  全部核心测试完成" ;
+    PRINT "══════════════════════════════════════" ;
+    RET "OK" ;
+} ;
+
+CALL main ;

@@ -1,0 +1,244 @@
+VERSION "1.0.0" ;
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  TaskFlow - 前端生成器                                ║
+// ║  生成 index.html / style.css / app.js              ║
+// ╚══════════════════════════════════════════════════════╝
+
+FUNC log | level | str | msg | str | nil | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    PRINT "[" | ts | " " | level | "] " | msg ;
+} ;
+
+FUNC write_file | path | str | content | str | nil | {
+    FILE_WRITE path | content ;
+    CALL log | "info" | STR_JOIN "" | "已生成: " | path ;
+} ;
+
+FUNC generate_css | nil | {
+    VAR css | str ;
+    SET css | STR_JOIN "" |
+":root { --primary: #6366f1; --primary-dark: #4f46e5; --danger: #ef4444; " |
+"--warning: #f59e0b; --success: #10b981; --bg: #f8fafc; " |
+"--card: #ffffff; --text: #1e293b; --text-secondary: #64748b; " |
+"--border: #e2e8f0; --shadow: 0 1px 3px rgba(0,0,0,0.1); " |
+"--radius: 8px; }\n" |
+
+"* { margin:0; padding:0; box-sizing:border-box; }\n" |
+"body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; " |
+"background: var(--bg); color: var(--text); line-height:1.6; }\n" |
+
+".app { display:flex; min-height:100vh; }\n" |
+
+".sidebar { width:260px; background:var(--card); border-right:1px solid var(--border); " |
+"padding:20px; display:flex; flex-direction:column; gap:8px; }\n" |
+".sidebar h1 { font-size:1.5rem; color:var(--primary); margin-bottom:16px; }\n" |
+".sidebar .nav-item { display:flex; align-items:center; gap:8px; padding:10px 12px; " |
+"border-radius:var(--radius); cursor:pointer; transition:background .2s; " |
+"color:var(--text-secondary); font-size:.9rem; border:none; background:none; width:100%; text-align:left; }\n" |
+".sidebar .nav-item:hover, .sidebar .nav-item.active { background:#eef2ff; color:var(--primary); }\n" |
+".sidebar .nav-item .count { margin-left:auto; background:var(--primary); color:#fff; " |
+"border-radius:12px; padding:0 8px; font-size:.75rem; }\n" |
+
+".main { flex:1; padding:24px 32px; overflow-y:auto; }\n" |
+".header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }\n" |
+".header h2 { font-size:1.5rem; font-weight:600; }\n" |
+".btn { padding:8px 16px; border-radius:var(--radius); border:none; cursor:pointer; " |
+"font-size:.875rem; font-weight:500; transition:all .2s; }\n" |
+".btn-primary { background:var(--primary); color:#fff; }\n" |
+".btn-primary:hover { background:var(--primary-dark); }\n" |
+".btn-outline { background:#fff; border:1px solid var(--border); color:var(--text); }\n" |
+".btn-outline:hover { background:#f1f5f9; }\n" |
+".btn-danger { background:var(--danger); color:#fff; }\n" |
+".btn-sm { padding:4px 10px; font-size:.8rem; }\n" |
+
+".stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }\n" |
+".stat-card { background:var(--card); border-radius:var(--radius); padding:20px; " |
+"box-shadow:var(--shadow); }\n" |
+".stat-card .stat-value { font-size:2rem; font-weight:700; }\n" |
+".stat-card .stat-label { color:var(--text-secondary); font-size:.85rem; margin-top:4px; }\n" |
+
+".task-list { display:flex; flex-direction:column; gap:8px; }\n" |
+".task-item { background:var(--card); border-radius:var(--radius); padding:16px 20px; " |
+"box-shadow:var(--shadow); display:flex; align-items:center; gap:12px; cursor:pointer; " |
+"transition:transform .1s; }\n" |
+".task-item:hover { transform:translateY(-1px); }\n" |
+".task-item.done { opacity:.6; }\n" |
+".task-item .priority { width:4px; height:40px; border-radius:2px; }\n" |
+".task-item .task-info { flex:1; }\n" |
+".task-item .task-title { font-weight:500; }\n" |
+".task-item .task-meta { font-size:.8rem; color:var(--text-secondary); margin-top:2px; }\n" |
+".badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:.75rem; " |
+"font-weight:500; }\n" |
+".badge-high { background:#fef2f2; color:var(--danger); }\n" |
+".badge-medium { background:#fffbeb; color:var(--warning); }\n" |
+".badge-low { background:#f0fdf4; color:var(--success); }\n" |
+
+".modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); " |
+"z-index:100; justify-content:center; align-items:center; }\n" |
+".modal-overlay.show { display:flex; }\n" |
+".modal { background:var(--card); border-radius:12px; padding:24px; width:90%; max-width:500px; " |
+"max-height:80vh; overflow-y:auto; }\n" |
+".modal h3 { margin-bottom:16px; }\n" |
+".form-group { margin-bottom:12px; }\n" |
+".form-group label { display:block; font-size:.85rem; font-weight:500; margin-bottom:4px; color:var(--text-secondary); }\n" |
+".form-group input, .form-group select, .form-group textarea { width:100%; padding:8px 12px; " |
+"border:1px solid var(--border); border-radius:var(--radius); font-size:.9rem; " |
+"font-family:inherit; }\n" |
+".form-group textarea { resize:vertical; min-height:80px; }\n" |
+".form-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }\n" |
+
+".search-bar { position:relative; }\n" |
+".search-bar input { padding:8px 12px 8px 36px; border:1px solid var(--border); " |
+"border-radius:var(--radius); width:240px; font-size:.9rem; }\n" |
+".empty-state { text-align:center; padding:48px; color:var(--text-secondary); }\n" |
+
+"@media(max-width:768px) { .app { flex-direction:column; } .sidebar { width:100%; " |
+"flex-direction:row; overflow-x:auto; } .stats { grid-template-columns:repeat(2,1fr); } }\n" ;
+
+    CALL write_file | "./static/style.css" | css ;
+    RET "OK" ;
+} ;
+
+FUNC generate_js | nil | {
+    VAR js | str ;
+    SET js | STR_JOIN "" |
+"const API = '/api';\n" |
+"let currentUser = 1;\n" |
+"let currentFilter = '';\n\n" |
+
+"async function fetchJSON(url) {\n" |
+"  const res = await fetch(url);\n" |
+"  return res.ok ? res.json() : [];\n" |
+"}\n\n" |
+
+"async function loadDashboard() {\n" |
+"  const stats = await fetchJSON(API+'/dashboard?user_id='+currentUser);\n" |
+"  document.getElementById('stat-total').textContent = stats.tasks?.total || 0;\n" |
+"  document.getElementById('stat-progress').textContent = stats.tasks?.in_progress || 0;\n" |
+"  document.getElementById('stat-done').textContent = stats.tasks?.done || 0;\n" |
+"  document.getElementById('stat-urgent').textContent = stats.tasks?.urgent || 0;\n" |
+"}\n\n" |
+
+"async function loadTasks(filter) {\n" |
+"  currentFilter = filter || '';\n" |
+"  let url = API+'/tasks?user_id='+currentUser;\n" |
+"  if (filter) url += '&status='+filter;\n" |
+"  const tasks = await fetchJSON(url);\n" |
+"  const container = document.getElementById('task-container');\n" |
+"  if (!tasks.length) {\n" |
+"    container.innerHTML = '<div class=\"empty-state\">暂无任务</div>';\n" |
+"    return;\n" |
+"  }\n" |
+"  const priorityColors = {1:'#10b981',2:'#3b82f6',3:'#f59e0b',4:'#ef4444'};\n" |
+"  container.innerHTML = tasks.map(t => {\n" |
+"    const pc = priorityColors[t.priority]||'#94a3b8';\n" |
+"    const statusLabel = {todo:'待办',in_progress:'进行中',done:'已完成'};\n" |
+"    return `<div class=\"task-item ${t.status}\" onclick=\"showTask(${t.id})\">\n" |
+"      <div class=\"priority\" style=\"background:${pc}\"></div>\n" |
+"      <div class=\"task-info\">\n" |
+"        <div class=\"task-title\">${t.title}</div>\n" |
+"        <div class=\"task-meta\">${t.category||''} | ${t.due_date||'无截止'} | ${statusLabel[t.status]||t.status}</div>\n" |
+"      </div>\n" |
+"      ${t.priority>=3?'<span class=\"badge badge-high\">紧急</span>':''}\n" |
+"    </div>`;\n" |
+"  }).join('');\n" |
+"}\n\n" |
+
+"function showTask(id) {\n" |
+"  alert('任务详情 #'+id);\n" |
+"}\n\n" |
+
+"function showNewTaskModal() {\n" |
+"  document.getElementById('modal').classList.add('show');\n" |
+"}\n" |
+"function hideModal() {\n" |
+"  document.getElementById('modal').classList.remove('show');\n" |
+"}\n\n" |
+
+"function setActiveNav(el, filter) {\n" |
+"  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));\n" |
+"  el.classList.add('active');\n" |
+"  loadTasks(filter);\n" |
+"}\n\n" |
+
+"loadDashboard(); loadTasks();\n" ;
+
+    CALL write_file | "./static/app.js" | js ;
+    RET "OK" ;
+} ;
+
+FUNC generate_html | nil | {
+    VAR html | str ;
+    SET html | STR_JOIN "" |
+"<!DOCTYPE html>\n" |
+"<html lang=\"zh-CN\">\n" |
+"<head>\n" |
+"  <meta charset=\"UTF-8\">\n" |
+"  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n" |
+"  <title>TaskFlow - 任务管理</title>\n" |
+"  <link rel=\"stylesheet\" href=\"/static/style.css\">\n" |
+"</head>\n" |
+"<body>\n" |
+"<div class=\"app\">\n" |
+"  <nav class=\"sidebar\">\n" |
+"    <h1>TaskFlow</h1>\n" |
+"    <button class=\"nav-item active\" onclick=\"setActiveNav(this,'')\">全部任务</button>\n" |
+"    <button class=\"nav-item\" onclick=\"setActiveNav(this,'in_progress')\">进行中</button>\n" |
+"    <button class=\"nav-item\" onclick=\"setActiveNav(this,'todo')\">待办</button>\n" |
+"    <button class=\"nav-item\" onclick=\"setActiveNav(this,'done')\">已完成</button>\n" |
+"    <div style=\"margin-top:auto\">\n" |
+"      <button class=\"btn btn-primary\" style=\"width:100%\" onclick=\"showNewTaskModal()\">+ 新建任务</button>\n" |
+"    </div>\n" |
+"  </nav>\n" |
+"  <main class=\"main\">\n" |
+"    <div class=\"header\">\n" |
+"      <h2>任务面板</h2>\n" |
+"      <button class=\"btn btn-primary\" onclick=\"showNewTaskModal()\">+ 新建任务</button>\n" |
+"    </div>\n" |
+"    <div class=\"stats\">\n" |
+"      <div class=\"stat-card\"><div class=\"stat-value\" id=\"stat-total\">0</div><div class=\"stat-label\">总任务</div></div>\n" |
+"      <div class=\"stat-card\"><div class=\"stat-value\" id=\"stat-progress\">0</div><div class=\"stat-label\">进行中</div></div>\n" |
+"      <div class=\"stat-card\"><div class=\"stat-value\" id=\"stat-done\">0</div><div class=\"stat-label\">已完成</div></div>\n" |
+"      <div class=\"stat-card\"><div class=\"stat-value\" id=\"stat-urgent\">0</div><div class=\"stat-label\">紧急</div></div>\n" |
+"    </div>\n" |
+"    <div class=\"task-list\" id=\"task-container\"></div>\n" |
+"  </main>\n" |
+"</div>\n" |
+"<div class=\"modal-overlay\" id=\"modal\">\n" |
+"  <div class=\"modal\">\n" |
+"    <h3>新建任务</h3>\n" |
+"    <div class=\"form-group\"><label>标题</label><input id=\"new-title\" placeholder=\"任务标题\"></div>\n" |
+"    <div class=\"form-group\"><label>描述</label><textarea id=\"new-desc\" placeholder=\"任务描述\"></textarea></div>\n" |
+"    <div class=\"form-group\"><label>分类</label>\n" |
+"      <select id=\"new-category\"><option>工作</option><option>学习</option><option>生活</option><option>健康</option></select>\n" |
+"    </div>\n" |
+"    <div class=\"form-group\"><label>优先级</label>\n" |
+"      <select id=\"new-priority\"><option value=\"1\">低</option><option value=\"2\">中</option><option value=\"3\" selected>高</option><option value=\"4\">紧急</option></select>\n" |
+"    </div>\n" |
+"    <div class=\"form-group\"><label>截止日期</label><input type=\"date\" id=\"new-due\"></div>\n" |
+"    <div class=\"form-actions\">\n" |
+"      <button class=\"btn btn-outline\" onclick=\"hideModal()\">取消</button>\n" |
+"      <button class=\"btn btn-primary\" onclick=\"createTask()\">创建</button>\n" |
+"    </div>\n" |
+"  </div>\n" |
+"</div>\n" |
+"<script src=\"/static/app.js\"></script>\n" |
+"</body>\n" |
+"</html>\n" ;
+
+    CALL write_file | "./static/index.html" | html ;
+    RET "OK" ;
+} ;
+
+FUNC main | str | {
+    CALL log | "info" | "TaskFlow 前端生成器" ;
+    CALL generate_css ;
+    CALL generate_js ;
+    CALL generate_html ;
+    CALL log | "info" | "前端文件生成完成！" ;
+    RET "OK" ;
+} ;
+
+CALL main ;

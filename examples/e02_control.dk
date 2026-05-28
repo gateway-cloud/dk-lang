@@ -1,0 +1,41 @@
+VERSION "1.0.0" ;
+
+// DK-Lang 示例2：流程控制 — IF + LOOP + SWITCH
+
+// 条件判断
+VAR score | int ;
+SET score | 85 ;
+
+IF gt | score | 80 | {
+    PRINT "优秀" ;
+} ;
+
+IF lt | score | 60 | {
+    PRINT "不及格" ;
+} | {
+    PRINT "及格" ;
+} ;
+
+// 计数循环
+VAR i | int ;
+VAR total | int ;
+SET total | 0 ;
+LOOP i | 1 | 5 | 1 | {
+    SET total | CALC add | total | i ;
+} ;
+PRINT "1+2+3+4+5 =" | total ;
+
+// 条件循环
+VAR n | int ;
+SET n | 5 ;
+WHILE gt | n | 0 | {
+    PRINT "倒计时:" | n ;
+    SET n | CALC sub | n | 1 ;
+} ;
+
+// switch
+SWITCH score | {
+    CASE 95 | { PRINT "A+" ; }
+    CASE 85 | { PRINT "B" ; }
+    DEFAULT | { PRINT "其他" ; }
+} ;

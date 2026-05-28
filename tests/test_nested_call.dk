@@ -1,0 +1,38 @@
+VERSION "1.0.0" ;
+
+// 最小复现：嵌套 CALL 作为参数
+FUNC today_str | str | {
+    RET "2026-05-28" ;
+} ;
+
+FUNC date_to_days | date_str | str | int | {
+    VAR y_str | str ;
+    STR_CUT y_str | date_str | 0 | 4 ;
+    RET AS(y_str, int) ;
+} ;
+
+FUNC add_days_to_date | date_str | str | days_to_add | int | str | {
+    VAR days | int ;
+    SET days | CALL date_to_days | date_str ;
+    SET days | CALC add | days | days_to_add ;
+    RET STR_JOIN "" | CALL int_to_str | days ;
+} ;
+
+FUNC int_to_str | num | int | str | {
+    IF eq | num | 0 | { RET "0" ; } ;
+    RET "non-zero" ;
+} ;
+
+// 这个调用链应该和 library_system 的一样
+VAR GLOBAL_DAYS | int ;
+SET GLOBAL_DAYS | 30 ;
+
+FUNC borrow_book | str | {
+    VAR due | str ;
+    SET due | CALL add_days_to_date | CALL today_str | GLOBAL_DAYS ;
+    PRINT "due =" | due ;
+    RET "OK" ;
+} ;
+
+CALL borrow_book ;
+PRINT "Test passed!" ;

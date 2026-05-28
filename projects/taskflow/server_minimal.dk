@@ -1,0 +1,30 @@
+VERSION "1.0.0" ;
+
+FUNC log | level | str | msg | str | nil | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    PRINT "[" | ts | " " | level | "] " | msg ;
+} ;
+
+FUNC health | req_data | str | str | {
+    RET `{"status":"ok","message":"DK-Lang Server Running!"}` ;
+} ;
+
+FUNC get_time | req_data | str | str | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    RET STR_JOIN "" | `{"time":"` | ts | `"}` ;
+} ;
+
+FUNC main | str | {
+    CALL log | "info" | "Minimal DK-Lang Server starting..." ;
+
+    SERVER "0.0.0.0" | 8088 | {
+        ROUTE "GET" | "/api/health" | health ;
+        ROUTE "GET" | "/api/time" | get_time ;
+    } ;
+
+    RET "OK" ;
+} ;
+
+CALL main ;

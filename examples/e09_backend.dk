@@ -1,0 +1,78 @@
+VERSION "1.0.0" ;
+PERMIT "file_read" ;
+PERMIT "file_write" ;
+
+// ═══════════════════════════════════════════
+// DK-Lang 工业级示例：后端 REST API 服务
+// ═══════════════════════════════════════════
+
+FUNC log | level | str | msg | str | str | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    PRINT "[ " | ts | " " | level | " ] " | msg ;
+    RET "ok" ;
+} ;
+
+FUNC init_db | str | {
+    CALL log | "info" | "数据库初始化" ;
+    RET "initialized" ;
+} ;
+
+FUNC create_user | name | str | email | str | age | int | str | {
+    CALL log | "info" | "创建用户" ;
+    RET name ;
+} ;
+
+FUNC list_users | str | {
+    CALL log | "info" | "查询所有用户" ;
+    RET "[\"Alice\", \"Bob\", \"Carol\"]" ;
+} ;
+
+FUNC handle_get | path | str | str | {
+    VAR result | str ;
+    IF eq | path | "/users" | {
+        SET result | CALL list_users ;
+    } | {
+        SET result | "{\"error\": \"not_found\"}" ;
+    } ;
+    RET result ;
+} ;
+
+FUNC handle_post | path | str | body | str | str | {
+    IF eq | path | "/users" | {
+        SET body | "{\"status\": \"created\"}" ;
+        RET body ;
+    } ;
+    RET "{\"error\": \"not_found\"}" ;
+} ;
+
+// ── 主函数 ──
+FUNC main | str | {
+    CALL log | "info" | "===== API 服务启动 =====" ;
+    CALL init_db ;
+
+    // GET /users
+    VAR resp | str ;
+    SET resp | CALL handle_get | "/users" ;
+    PRINT "GET  /users  :" | resp ;
+
+    // POST /users
+    SET resp | CALL handle_post | "/users" | "{\"name\":\"Dave\"}" ;
+    PRINT "POST /users  :" | resp ;
+
+    // 统计
+    VAR total | int ;
+    SET total | 3 ;
+    VAR avg_age | real ;
+    SET avg_age | 28.3 ;
+
+    PRINT "======== 统计 ========" ;
+    PRINT "总用户:" | total ;
+    PRINT "均龄:" | avg_age ;
+    PRINT "======================" ;
+
+    CALL log | "info" | "===== 服务关闭 =====" ;
+    RET "done" ;
+} ;
+
+CALL main ;

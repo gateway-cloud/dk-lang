@@ -1,0 +1,32 @@
+VERSION "1.0.0" ;
+
+// 测试多行字符串
+VAR html | str ;
+SET html | `
+<html>
+<head><title>Test</title></head>
+<body>
+  <h1>Hello DK-Lang!</h1>
+  <p>This is a multi-line string test.</p>
+</body>
+</html>
+` ;
+PRINT "HTML length:" | STR_LEN html ;
+PRINT "First 30 chars:" | STR_CUT html | 0 | 30 ;
+
+// 测试 HTTP handler
+FUNC health_handler | req_data | str | str | {
+    RET `{"status":"ok","service":"DK-Lang Native"}` ;
+} ;
+
+FUNC get_tasks | req_data | str | str | {
+    RET `[{"id":1,"title":"Test Task"}]` ;
+} ;
+
+// 启动服务器（非阻塞，5秒后超时会退出）
+// SERVER "0.0.0.0" | 8080 | {
+//     ROUTE "GET" | "/api/health" | health_handler ;
+//     ROUTE "GET" | "/api/tasks" | get_tasks ;
+// } ;
+
+PRINT "All basic tests passed!" ;

@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+dist/
+*.msi
+*.exe
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test artifacts
+tests/__pycache__/
+test_output.txt
+student_data.txt
+library_data.txt
+taskflow.db
+test_taskflow.db
+*.db-shm
+*.db-wal
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+*.spec

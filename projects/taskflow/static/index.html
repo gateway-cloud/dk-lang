@@ -1,0 +1,40 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TaskFlow v2.0 - DK-Lang Native</title>
+<style>
+:root{--p:#6366f1;--bg:#f8fafc;--card:#fff;--t:#1e293b;--t2:#64748b;--b:#e2e8f0;--r:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--t);padding:32px;max-width:800px;margin:0 auto}
+h1{color:var(--p);margin-bottom:8px}
+.sub{color:var(--t2);font-size:.85rem;margin-bottom:24px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);text-align:center}
+.card .v{font-size:1.75rem;font-weight:700;color:var(--p)}
+.card .l{color:var(--t2);font-size:.78rem;margin-top:4px}
+.task{background:var(--card);border-radius:var(--r);padding:14px 18px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:center;gap:10px}
+.task .dot{width:8px;height:8px;border-radius:50%}
+.task .dot.todo{background:#f59e0b}.task .dot.progress{background:#3b82f6}.task .dot.done{background:#10b981}
+.task .info{flex:1}
+.task .info .title{font-weight:500}
+.task .info .meta{font-size:.78rem;color:var(--t2)}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<h1>TaskFlow v2.0</h1>
+<p class="sub">Powered by DK-Lang Native Server</p>
+<div class="stats">
+<div class="card"><div class="v" id="v1">-</div><div class="l">总任务</div></div>
+<div class="card"><div class="v" id="v2">-</div><div class="l">进行中</div></div>
+<div class="card"><div class="v" id="v3">-</div><div class="l">已完成</div></div>
+<div class="card"><div class="v" id="v4">-</div><div class="l">紧急</div></div>
+</div>
+<div id="list"></div>
+<script>
+async function load(){try{const r=await fetch('/api/tasks');const t=await r.json();const cs={todo:'todo',in_progress:'progress',done:'done'};document.getElementById('list').innerHTML=t.map(x=>'<div class="task"><div class="dot '+cs[x.status]+'"></div><div class="info"><div class="title">'+x.title+'</div><div class="meta">状态:'+x.status+' | 优先级:'+x.priority+'</div></div></div>').join('');document.getElementById('v1').textContent=t.length;document.getElementById('v2').textContent=t.filter(x=>x.status==='in_progress').length;document.getElementById('v3').textContent=t.filter(x=>x.status==='done').length;document.getElementById('v4').textContent=t.filter(x=>x.priority>=3).length}catch(e){document.getElementById('list').innerHTML='<div style="text-align:center;padding:40px;color:var(--t2)">加载中...</div>'}setTimeout(load,5000)}load();
+</script>
+</body>
+</html>

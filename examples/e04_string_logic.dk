@@ -1,0 +1,27 @@
+VERSION "1.0.0" ;
+
+// DK-Lang 示例4：字符串 + 逻辑
+
+VAR text | str ;
+SET text | "Hello DK-Lang!" ;
+
+PRINT "文本:" | text ;
+
+// 字符串长度
+VAR len | int ;
+STR_LEN len | text ;
+PRINT "长度:" | len ;
+
+// 逻辑运算
+VAR a | bool ;
+SET a | true ;
+VAR b | bool ;
+SET b | false ;
+
+VAR r1 | bool ;
+SET r1 | CALC AND | a | b ;
+PRINT "true AND false =" | r1 ;
+
+VAR r2 | bool ;
+SET r2 | CALC OR | a | b ;
+PRINT "true OR false =" | r2 ;

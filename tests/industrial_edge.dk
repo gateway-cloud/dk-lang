@@ -1,0 +1,209 @@
+VERSION "1.0.0" ;
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  工业级测试套件 #2: 边界条件 + 压力测试                    ║
+// ╚══════════════════════════════════════════════════════════╝
+
+FUNC assert | name | str | condition | bool | str | {
+    IF eq | condition | true | { RET "PASS" ; } ;
+    PRINT "[✗] " | name ;
+    RET "FAIL" ;
+} ;
+FUNC assert_eq | name | str | a | int | b | int | str | {
+    VAR ok | bool ;
+    SET ok | CALC eq | a | b ;
+    CALL assert | name | ok ;
+    RET "OK" ;
+} ;
+
+// ─── 边界: 大数运算 ───
+FUNC test_large_numbers | str | {
+    PRINT "── 大数运算 ──" ;
+    VAR big | int ;
+    SET big | CALC mul | 99999 | 99999 ;
+    VAR result | bool ;
+    SET result | CALC gt | big | 0 ;
+    CALL assert | "99999*99999>0" | result ;
+    RET "OK" ;
+} ;
+
+// ─── 边界: 空字符串 ───
+FUNC test_empty_strings | str | {
+    PRINT "── 空字符串 ──" ;
+    VAR s | str ;
+    SET s | "" ;
+    VAR len | int ;
+    STR_LEN len | s ;
+    CALL assert_eq | "strlen('')=0" | len | 0 ;
+
+    VAR joined | str ;
+    SET joined | STR_JOIN "" | "" | "" ;
+    CALL assert_eq | "join('','')=0" | STR_LEN joined | 0 ;
+    RET "OK" ;
+} ;
+
+// ─── 边界: 多行字符串 ───
+FUNC test_multiline | str | {
+    PRINT "── 多行字符串(反引号) ──" ;
+    VAR ml | str ;
+    SET ml | `
+line1
+line2
+line3
+` ;
+    VAR len | int ;
+    STR_LEN len | ml ;
+    VAR ml_ok | bool ;
+    SET ml_ok | CALC gt | len | 10 ;
+    CALL assert | "multiline len>10" | ml_ok ;
+    RET "OK" ;
+} ;
+
+// ─── 压力: 深层嵌套函数调用 ───
+FUNC deep_a | x | int | int | { RET CALC add | x | 1 ; } ;
+FUNC deep_b | x | int | int | { RET CALL deep_a | x ; } ;
+FUNC deep_c | x | int | int | { RET CALL deep_b | x ; } ;
+FUNC deep_d | x | int | int | { RET CALL deep_c | x ; } ;
+FUNC deep_e | x | int | int | { RET CALL deep_d | x ; } ;
+
+FUNC test_deep_calls | str | {
+    PRINT "── 深层嵌套调用 ──" ;
+    VAR r | int ;
+    SET r | CALL deep_e | 0 ;
+    CALL assert_eq | "5-deep return 1" | r | 1 ;
+    RET "OK" ;
+} ;
+
+// ─── 压力: 大循环 ───
+FUNC test_large_loop | str | {
+    PRINT "── 大循环(10000次) ──" ;
+    VAR i | int ;
+    VAR s | int ;
+    SET s | 0 ;
+    LOOP i | 1 | 10000 | 1 | {
+        SET s | CALC add | s | 1 ;
+    } ;
+    CALL assert_eq | "loop 10000 sum" | s | 10000 ;
+    RET "OK" ;
+} ;
+
+// ─── 边界: 数组边界操作 ───
+FUNC test_array_bounds | str | {
+    PRINT "── 数组边界 ──" ;
+    ARR nums_arr | int | 1 | 2 | 3 ;
+    VAR ok | bool ;
+    SET ok | true ;
+
+    // 合法访问
+    VAR v | int ;
+    SET v | GET nums_arr | 0 ;
+    SET v | GET nums_arr | 2 ;
+
+    // 越界应被 TRY/CATCH 捕获
+    TRY | { VAR bad | int ; SET bad | GET nums_arr | 99 ; SET ok | false ; }
+    CATCH "Error" | { SET ok | true ; } ;
+    CALL assert | "ARR out-of-bounds caught" | ok ;
+    RET "OK" ;
+} ;
+
+// ─── 压力: Map 大量操作 ───
+FUNC test_map_stress | str | {
+    PRINT "── Map 密集操作 ──" ;
+    VAR m | map[str,int] ;
+    VAR i | int ;
+    LOOP i | 1 | 100 | 1 | {
+        VAR key | str ;
+        SET key | STR_JOIN "" | "k" | CALL int_to_str | i ;
+        MAP_SET m | key | i ;
+    } ;
+    VAR v | int ;
+    SET v | MAP_GET m | "k50" ;
+    CALL assert_eq | "map[50]=50 after 100 inserts" | v | 50 ;
+    RET "OK" ;
+} ;
+
+FUNC int_to_str | num | int | str | {
+    IF eq | num | 0 | { RET "0" ; } ;
+    VAR n | int ; SET n | num ;
+    VAR r | str ; SET r | "" ;
+    WHILE gt | n | 0 | {
+        VAR d | int ; SET d | CALC mod | n | 10 ;
+        SWITCH d | {
+            CASE 0 | { SET r | STR_JOIN "" | "0" | r ; }
+            CASE 1 | { SET r | STR_JOIN "" | "1" | r ; }
+            CASE 2 | { SET r | STR_JOIN "" | "2" | r ; }
+            CASE 3 | { SET r | STR_JOIN "" | "3" | r ; }
+            CASE 4 | { SET r | STR_JOIN "" | "4" | r ; }
+            CASE 5 | { SET r | STR_JOIN "" | "5" | r ; }
+            CASE 6 | { SET r | STR_JOIN "" | "6" | r ; }
+            CASE 7 | { SET r | STR_JOIN "" | "7" | r ; }
+            CASE 8 | { SET r | STR_JOIN "" | "8" | r ; }
+            CASE 9 | { SET r | STR_JOIN "" | "9" | r ; }
+        } ;
+        SET n | CALC div | n | 10 ; SET n | AS(n, int) ;
+    } ;
+    RET r ;
+} ;
+
+// ─── 内联 STR_JOIN 表达式测试 ───
+FUNC test_inline_strings | str | {
+    PRINT "── 内联字符串表达式 ──" ;
+
+    VAR msg | str ;
+    SET msg | STR_JOIN "" | "Hello " | "DK-Lang" | " v1.3" ;
+    VAR len | int ;
+    STR_LEN len | msg ;
+    VAR ij_ok | bool ;
+    SET ij_ok | CALC gt | len | 10 ;
+    CALL assert | "inline join len>10" | ij_ok ;
+
+    VAR result | str ;
+    SET result | CALL greet | "Test" ;
+    VAR ok | bool ; SET ok | CALC eq | result | "Hi Test!" ;
+    CALL assert | "inline call+join" | ok ;
+    RET "OK" ;
+} ;
+
+FUNC greet | name | str | str | { RET STR_JOIN "" | "Hi " | name | "!" ; } ;
+
+// ─── GLOBAL/LOCAL 作用域 ───
+GLOBAL gx | int ;
+SET gx | 100 ;
+
+FUNC test_scopes | str | {
+    PRINT "── 作用域测试 ──" ;
+    VAR local_x | int ;
+    SET local_x | 42 ;
+    CALL assert_eq | "global gx=100" | gx | 100 ;
+    CALL assert_eq | "local x=42" | local_x | 42 ;
+
+    // 修改 global
+    SET gx | 200 ;
+    CALL assert_eq | "global gx→200" | gx | 200 ;
+
+    RET "OK" ;
+} ;
+
+// ─── 主入口 ───
+FUNC main | str | {
+    PRINT "══════════════════════════════════════" ;
+    PRINT "  工业级测试套件 #2: 边界+压力" ;
+    PRINT "══════════════════════════════════════" ;
+
+    CALL test_large_numbers ;
+    CALL test_empty_strings ;
+    CALL test_multiline ;
+    CALL test_deep_calls ;
+    CALL test_large_loop ;
+    CALL test_array_bounds ;
+    CALL test_map_stress ;
+    CALL test_inline_strings ;
+    CALL test_scopes ;
+
+    PRINT "══════════════════════════════════════" ;
+    PRINT "  边界/压力测试完成" ;
+    PRINT "══════════════════════════════════════" ;
+    RET "OK" ;
+} ;
+
+CALL main ;

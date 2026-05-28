@@ -1,0 +1,10 @@
+VERSION "1.0.0" ;
+
+FUNC today_str | str | { RET "2026-05-28" ; } ;
+FUNC main | str | {
+    VAR t | str ;
+    SET t | CALL today_str ;
+    PRINT "today=" | t ;
+    RET "OK" ;
+} ;
+CALL main ;

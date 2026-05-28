@@ -1,0 +1,39 @@
+VERSION "1.0.0" ;
+
+// 测试1: 直接传参（无嵌套CALL）
+FUNC today_str | str | { RET "2026-05-28" ; } ;
+
+FUNC date_to_days | date_str | str | int | {
+    VAR y_str | str ;
+    STR_CUT y_str | date_str | 0 | 4 ;
+    RET AS(y_str, int) ;
+} ;
+
+FUNC add_days_to_date | date_str | str | days_to_add | int | str | {
+    VAR days | int ;
+    SET days | CALL date_to_days | date_str ;
+    SET days | CALC add | days | days_to_add ;
+    RET STR_JOIN "" | CALL int_to_str | days ;
+} ;
+
+FUNC int_to_str | num | int | str | {
+    IF eq | num | 0 | { RET "0" ; } ;
+    RET "non-zero" ;
+} ;
+
+VAR GLOBAL_DAYS | int ;
+SET GLOBAL_DAYS | 30 ;
+
+// 测试1: 不用嵌套CALL，先计算结果再传参
+VAR today | str ;
+SET today | CALL today_str ;
+VAR due1 | str ;
+SET due1 | CALL add_days_to_date | today | GLOBAL_DAYS ;
+PRINT "due1 =" | due1 ;
+
+// 测试2: 嵌套CALL作为参数
+VAR due2 | str ;
+SET due2 | CALL add_days_to_date | CALL today_str | GLOBAL_DAYS ;
+PRINT "due2 =" | due2 ;
+
+PRINT "All tests passed!" ;

@@ -1,0 +1,899 @@
+VERSION "1.0.0" ;
+PERMIT "file_read" ;
+PERMIT "file_write" ;
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║      📚 图 书 借 阅 管 理 系 统  (Library System)           ║
+// ║              DK-Lang v1.1 中大型项目压测                     ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ==============================================================
+//  数据模型：
+//    books:     arr[map[str,str]]  键: isbn, title, author, category, year, total, available, location
+//    members:   arr[map[str,str]]  键: id, name, phone, email, type, join_date, borrowed_count, fine
+//    borrows:   arr[map[str,str]]  键: borrow_id, member_id, isbn, borrow_date, due_date, return_date, status
+//    reserves:  arr[map[str,str]]  键: reserve_id, member_id, isbn, reserve_date, status, notify_date
+//    categories: set[str]
+// ==============================================================
+
+GLOBAL books | arr[map[str,str]] ;
+GLOBAL members | arr[map[str,str]] ;
+GLOBAL borrows | arr[map[str,str]] ;
+GLOBAL reserves | arr[map[str,str]] ;
+GLOBAL categories | set[str] ;
+
+GLOBAL book_count | int ;
+SET book_count | 0 ;
+GLOBAL member_count | int ;
+SET member_count | 0 ;
+GLOBAL borrow_count | int ;
+SET borrow_count | 0 ;
+GLOBAL reserve_count | int ;
+SET reserve_count | 0 ;
+GLOBAL borrow_id_counter | int ;
+SET borrow_id_counter | 1000 ;
+GLOBAL reserve_id_counter | int ;
+SET reserve_id_counter | 2000 ;
+
+// 借阅规则常量
+GLOBAL MAX_BORROW | int ;
+SET MAX_BORROW | 5 ;
+GLOBAL BORROW_DAYS | int ;
+SET BORROW_DAYS | 30 ;
+GLOBAL FINE_PER_DAY | real ;
+SET FINE_PER_DAY | 0.5 ;
+GLOBAL MAX_RESERVE | int ;
+SET MAX_RESERVE | 3 ;
+
+// ==============================================================
+//  工具函数
+// ==============================================================
+
+FUNC log | level | str | msg | str | nil | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    PRINT "[" | ts | " " | level | "] " | msg ;
+} ;
+
+FUNC divider | title | str | nil | {
+    PRINT "" ;
+    PRINT "════════════════ " | title | " ════════════════" ;
+} ;
+
+FUNC divider_small | title | str | nil | {
+    PRINT "── " | title | " ──" ;
+} ;
+
+FUNC int_to_str | num | int | str | {
+    IF eq | num | 0 | { RET "0" ; } ;
+    VAR result | str ;
+    SET result | "" ;
+    VAR n | int ;
+    SET n | num ;
+    VAR neg | bool ;
+    SET neg | false ;
+    IF lt | n | 0 | { SET neg | true ; SET n | CALC sub | 0 | n ; } ;
+    WHILE gt | n | 0 | {
+        VAR d | int ;
+        SET d | CALC mod | n | 10 ;
+        VAR ds | str ;
+        SWITCH d | {
+            CASE 0 | { SET ds | "0" ; } CASE 1 | { SET ds | "1" ; }
+            CASE 2 | { SET ds | "2" ; } CASE 3 | { SET ds | "3" ; }
+            CASE 4 | { SET ds | "4" ; } CASE 5 | { SET ds | "5" ; }
+            CASE 6 | { SET ds | "6" ; } CASE 7 | { SET ds | "7" ; }
+            CASE 8 | { SET ds | "8" ; } CASE 9 | { SET ds | "9" ; }
+        } ;
+        SET result | STR_JOIN "" | ds | result ;
+        SET n | CALC div | n | 10 ;
+        SET n | AS(n, int) ;
+    } ;
+    IF eq | neg | true | { SET result | STR_JOIN "" | "-" | result ; } ;
+    RET result ;
+} ;
+
+FUNC real_to_str | num | real | str | {
+    VAR ip | int ;
+    SET ip | AS(num, int) ;
+    VAR dp | int ;
+    SET dp | CALC mul | CALC sub | num | ip | 100 ;
+    SET dp | AS(dp, int) ;
+    IF lt | dp | 0 | { SET dp | CALC sub | 0 | dp ; } ;
+    RET STR_JOIN "" | CALL int_to_str | ip | "." | CALL int_to_str | dp ;
+} ;
+
+FUNC today_str | str | {
+    VAR ts | str ;
+    TIME ts | "YYYY-MM-DD" ;
+    RET ts ;
+} ;
+
+FUNC date_to_days | date_str | str | int | {
+    VAR year_str | str ;
+    STR_CUT year_str | date_str | 0 | 4 ;
+    VAR month_str | str ;
+    STR_CUT month_str | date_str | 5 | 2 ;
+    VAR day_str | str ;
+    STR_CUT day_str | date_str | 8 | 2 ;
+    VAR y | int ;
+    SET y | AS(year_str, int) ;
+    VAR m | int ;
+    SET m | AS(month_str, int) ;
+    VAR d | int ;
+    SET d | AS(day_str, int) ;
+    SET y | CALC sub | y | 2020 ;
+    VAR days | int ;
+    SET days | CALC mul | y | 365 ;
+    SET days | CALC add | days | d ;
+    // simplified: month * 30
+    SET days | CALC add | days | CALC mul | m | 30 ;
+    RET days ;
+} ;
+
+FUNC add_days_to_date | date_str | str | days_to_add | int | str | {
+    VAR days | int ;
+    SET days | CALL date_to_days | date_str ;
+    SET days | CALC add | days | days_to_add ;
+    VAR y | int ;
+    SET y | CALC div | days | 365 ;
+    SET y | CALC add | y | 2020 ;
+    VAR rem | int ;
+    SET rem | CALC mod | days | 365 ;
+    VAR m | int ;
+    SET m | CALC div | rem | 30 ;
+    SET m | CALC add | m | 1 ;
+    SET rem | CALC mod | rem | 30 ;
+    SET rem | CALC add | rem | 1 ;
+    VAR m_str | str ;
+    SET m_str | CALL int_to_str | m ;
+    VAR d_str | str ;
+    SET d_str | CALL int_to_str | rem ;
+    IF lt | m | 10 | { SET m_str | STR_JOIN "" | "0" | m_str ; } ;
+    IF lt | rem | 10 | { SET d_str | STR_JOIN "" | "0" | d_str ; } ;
+    RET STR_JOIN "" | CALL int_to_str | y | "-" | m_str | "-" | d_str ;
+} ;
+
+// ==============================================================
+//  图书管理
+// ==============================================================
+
+FUNC add_book | isbn | str | title | str | author | str | cat | str | year | int | total | int | loc | str | str | {
+    // 检查 ISBN 重复
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | i ;
+        IF eq | MAP_GET b | "isbn" | isbn | {
+            CALL log | "error" | STR_JOIN "" | "ISBN已存在: " | isbn ;
+            RET "DUPLICATE" ;
+        } ;
+    } ;
+
+    VAR book | map[str,str] ;
+    MAP_SET book | "isbn" | isbn ;
+    MAP_SET book | "title" | title ;
+    MAP_SET book | "author" | author ;
+    MAP_SET book | "category" | cat ;
+    MAP_SET book | "year" | CALL int_to_str | year ;
+    MAP_SET book | "total" | CALL int_to_str | total ;
+    MAP_SET book | "available" | CALL int_to_str | total ;
+    MAP_SET book | "location" | loc ;
+
+    PUSH books | book ;
+    SET book_count | CALC add | book_count | 1 ;
+
+    CALL log | "info" | STR_JOIN "" | "添加图书: " | title ;
+    RET "OK" ;
+} ;
+
+FUNC search_books | keyword | str | nil | {
+    VAR title_str | str ;
+    SET title_str | STR_JOIN "" | "搜索图书: " | keyword ;
+    CALL divider | title_str ;
+    VAR found | int ;
+    SET found | 0 ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | i ;
+        VAR title | str ;
+        SET title | MAP_GET b | "title" ;
+        VAR author | str ;
+        SET author | MAP_GET b | "author" ;
+        VAR isbn | str ;
+        SET isbn | MAP_GET b | "isbn" ;
+
+        VAR pos_t | int ;
+        STR_FIND pos_t | title | keyword ;
+        VAR pos_a | int ;
+        STR_FIND pos_a | author | keyword ;
+        VAR pos_i | int ;
+        STR_FIND pos_i | isbn | keyword ;
+
+        IF ge | CALC add | pos_t | pos_a | 0 | {
+            PRINT "  " | isbn | " | " | title | " | " | author | " | 可借:" | MAP_GET b | "available" ;
+            SET found | CALC add | found | 1 ;
+        } | {
+            IF ge | pos_i | 0 | {
+                PRINT "  " | isbn | " | " | title | " | " | author | " | 可借:" | MAP_GET b | "available" ;
+                SET found | CALC add | found | 1 ;
+            } ;
+        } ;
+    } ;
+    PRINT "  共找到 " | found | " 本" ;
+} ;
+
+FUNC list_books | nil | {
+    CALL divider | "馆藏图书" ;
+    IF eq | book_count | 0 | {
+        PRINT "  (暂无图书)" ; RET ;
+    } ;
+    PRINT "  ISBN\t\t书名\t\t作者\t\t分类\t\t馆藏/可借" ;
+    PRINT "  ─────────────────────────────────────────────────────" ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | i ;
+        PRINT "  " | MAP_GET b | "isbn" | "\t" | MAP_GET b | "title"
+              | "\t" | MAP_GET b | "author" | "\t" | MAP_GET b | "category"
+              | "\t" | MAP_GET b | "total" | "/" | MAP_GET b | "available" ;
+    } ;
+} ;
+
+FUNC list_categories | nil | {
+    CALL divider_small | "图书分类" ;
+    // 简单遍历所有图书的 category 去重展示
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | i ;
+        PRINT "  * " | MAP_GET b | "category" | " (" | MAP_GET b | "available" | "册可借)" ;
+    } ;
+} ;
+
+// ==============================================================
+//  会员管理
+// ==============================================================
+
+FUNC add_member | mid | str | name | str | phone | str | email | str | mtype | str | str | {
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | member_count | 1 | 1 | {
+        VAR m | map[str,str] ;
+        SET m | GET members | i ;
+        IF eq | MAP_GET m | "id" | mid | {
+            CALL log | "error" | STR_JOIN "" | "会员ID已存在: " | mid ;
+            RET "DUPLICATE" ;
+        } ;
+    } ;
+
+    VAR member | map[str,str] ;
+    MAP_SET member | "id" | mid ;
+    MAP_SET member | "name" | name ;
+    MAP_SET member | "phone" | phone ;
+    MAP_SET member | "email" | email ;
+    MAP_SET member | "type" | mtype ;
+    MAP_SET member | "join_date" | CALL today_str ;
+    MAP_SET member | "borrowed_count" | "0" ;
+    MAP_SET member | "fine" | "0.0" ;
+
+    PUSH members | member ;
+    SET member_count | CALC add | member_count | 1 ;
+
+    CALL log | "info" | STR_JOIN "" | "添加会员: " | name ;
+    RET "OK" ;
+} ;
+
+FUNC list_members | nil | {
+    CALL divider | "会员列表" ;
+    IF eq | member_count | 0 | {
+        PRINT "  (暂无会员)" ; RET ;
+    } ;
+    PRINT "  ID\t姓名\t\t类型\t\t在借\t欠费" ;
+    PRINT "  ─────────────────────────────────────" ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | member_count | 1 | 1 | {
+        VAR m | map[str,str] ;
+        SET m | GET members | i ;
+        PRINT "  " | MAP_GET m | "id" | "\t" | MAP_GET m | "name"
+              | "\t" | MAP_GET m | "type" | "\t" | MAP_GET m | "borrowed_count"
+              | "\t￥" | MAP_GET m | "fine" ;
+    } ;
+} ;
+
+// ==============================================================
+//  借阅管理（核心业务逻辑）
+// ==============================================================
+
+FUNC borrow_book | member_id | str | isbn | str | str | {
+    // 1. 查找会员
+    VAR member_found | bool ;
+    SET member_found | false ;
+    VAR member_idx | int ;
+    SET member_idx | -1 ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | member_count | 1 | 1 | {
+        VAR m | map[str,str] ;
+        SET m | GET members | i ;
+        IF eq | MAP_GET m | "id" | member_id | {
+            SET member_found | true ; SET member_idx | i ;
+        } ;
+    } ;
+    IF eq | member_found | false | {
+        CALL log | "error" | STR_JOIN "" | "会员不存在: " | member_id ;
+        RET "MEMBER_NOT_FOUND" ;
+    } ;
+
+    VAR member | map[str,str] ;
+    SET member | GET members | member_idx ;
+
+    // 2. 检查在借数量
+    VAR borrowed | int ;
+    SET borrowed | AS(MAP_GET member | "borrowed_count", int) ;
+    IF ge | borrowed | MAX_BORROW | {
+        CALL log | "warn" | STR_JOIN "" | "会员 " | member_id | " 已达最大借阅数" ;
+        RET "MAX_BORROW" ;
+    } ;
+
+    // 3. 检查欠费
+    VAR fine_val | real ;
+    SET fine_val | AS(MAP_GET member | "fine", real) ;
+    IF gt | fine_val | 0.0 | {
+        CALL log | "warn" | STR_JOIN "" | "会员 " | member_id | " 有欠费 ￥" | CALL real_to_str | fine_val ;
+        RET "HAS_FINE" ;
+    } ;
+
+    // 4. 查找图书
+    VAR book_found | bool ;
+    SET book_found | false ;
+    VAR book_idx | int ;
+    SET book_idx | -1 ;
+    VAR j | int ;
+    LOOP j | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | j ;
+        IF eq | MAP_GET b | "isbn" | isbn | {
+            SET book_found | true ; SET book_idx | j ;
+        } ;
+    } ;
+    IF eq | book_found | false | {
+        CALL log | "error" | STR_JOIN "" | "图书不存在: " | isbn ;
+        RET "BOOK_NOT_FOUND" ;
+    } ;
+
+    VAR book | map[str,str] ;
+    SET book | GET books | book_idx ;
+
+    // 5. 检查可借数量
+    VAR avail | int ;
+    SET avail | AS(MAP_GET book | "available", int) ;
+    IF le | avail | 0 | {
+        CALL log | "warn" | STR_JOIN "" | "图书已全部借出: " | isbn ;
+        RET "NO_AVAILABLE" ;
+    } ;
+
+    // 6. 创建借阅记录
+    VAR borrow | map[str,str] ;
+    MAP_SET borrow | "id" | CALL int_to_str | borrow_id_counter ;
+    MAP_SET borrow | "member_id" | member_id ;
+    MAP_SET borrow | "isbn" | isbn ;
+    MAP_SET borrow | "borrow_date" | CALL today_str ;
+    VAR due | str ;
+    SET due | CALL add_days_to_date | CALL today_str | BORROW_DAYS ;
+    MAP_SET borrow | "due_date" | due ;
+    MAP_SET borrow | "return_date" | "-" ;
+    MAP_SET borrow | "status" | "active" ;
+
+    PUSH borrows | borrow ;
+    SET borrow_count | CALC add | borrow_count | 1 ;
+    SET borrow_id_counter | CALC add | borrow_id_counter | 1 ;
+
+    // 7. 更新图书可借数
+    SET avail | CALC sub | avail | 1 ;
+    MAP_SET book | "available" | CALL int_to_str | avail ;
+
+    // 8. 更新会员在借数
+    SET borrowed | CALC add | borrowed | 1 ;
+    MAP_SET member | "borrowed_count" | CALL int_to_str | borrowed ;
+
+    CALL log | "info" | STR_JOIN "" | "借阅成功: " | MAP_GET member | "name" | " 借了 " | MAP_GET book | "title" | " (到期:" | due | ")" ;
+    RET CALL int_to_str | borrow_id_counter ;
+} ;
+
+FUNC return_book | borrow_id | str | str | {
+    // 1. 查找借阅记录
+    VAR borrow_found | bool ;
+    SET borrow_found | false ;
+    VAR borrow_idx | int ;
+    SET borrow_idx | -1 ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | borrow_count | 1 | 1 | {
+        VAR br | map[str,str] ;
+        SET br | GET borrows | i ;
+        IF eq | MAP_GET br | "id" | borrow_id | {
+            IF eq | MAP_GET br | "status" | "active" | {
+                SET borrow_found | true ; SET borrow_idx | i ;
+            } ;
+        } ;
+    } ;
+    IF eq | borrow_found | false | {
+        CALL log | "error" | STR_JOIN "" | "借阅记录不存在或已归还: " | borrow_id ;
+        RET "NOT_FOUND" ;
+    } ;
+
+    VAR borrow | map[str,str] ;
+    SET borrow | GET borrows | borrow_idx ;
+
+    VAR return_date | str ;
+    SET return_date | CALL today_str ;
+
+    // 2. 计算逾期罚款
+    VAR due_date | str ;
+    SET due_date | MAP_GET borrow | "due_date" ;
+    VAR due_days | int ;
+    SET due_days | CALL date_to_days | due_date ;
+    VAR ret_days | int ;
+    SET ret_days | CALL date_to_days | return_date ;
+    VAR overdue | int ;
+    SET overdue | CALC sub | ret_days | due_days ;
+
+    VAR fine | real ;
+    SET fine | 0.0 ;
+    IF gt | overdue | 0 | {
+        SET fine | CALC mul | overdue | FINE_PER_DAY ;
+        CALL log | "warn" | STR_JOIN "" | "逾期 " | overdue | " 天，罚款 ￥" | CALL real_to_str | fine ;
+    } ;
+
+    // 3. 更新借阅记录
+    MAP_SET borrow | "return_date" | return_date ;
+    MAP_SET borrow | "status" | "returned" ;
+
+    // 4. 更新图书可借数
+    VAR isbn | str ;
+    SET isbn | MAP_GET borrow | "isbn" ;
+    VAR j | int ;
+    LOOP j | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | j ;
+        IF eq | MAP_GET b | "isbn" | isbn | {
+            VAR avail | int ;
+            SET avail | AS(MAP_GET b | "available", int) ;
+            SET avail | CALC add | avail | 1 ;
+            MAP_SET b | "available" | CALL int_to_str | avail ;
+        } ;
+    } ;
+
+    // 5. 更新会员在借数和欠费
+    VAR member_id | str ;
+    SET member_id | MAP_GET borrow | "member_id" ;
+    VAR k | int ;
+    LOOP k | 0 | CALC sub | member_count | 1 | 1 | {
+        VAR m | map[str,str] ;
+        SET m | GET members | k ;
+        IF eq | MAP_GET m | "id" | member_id | {
+            VAR bc | int ;
+            SET bc | AS(MAP_GET m | "borrowed_count", int) ;
+            SET bc | CALC sub | bc | 1 ;
+            MAP_SET m | "borrowed_count" | CALL int_to_str | bc ;
+
+            IF gt | fine | 0.0 | {
+                VAR curr_fine | real ;
+                SET curr_fine | AS(MAP_GET m | "fine", real) ;
+                SET curr_fine | CALC add | curr_fine | fine ;
+                MAP_SET m | "fine" | CALL real_to_str | curr_fine ;
+            } ;
+        } ;
+    } ;
+
+    CALL log | "info" | STR_JOIN "" | "归还成功: 借阅ID " | borrow_id ;
+    RET "OK" ;
+} ;
+
+FUNC pay_fine | member_id | str | amount | real | str | {
+    VAR k | int ;
+    LOOP k | 0 | CALC sub | member_count | 1 | 1 | {
+        VAR m | map[str,str] ;
+        SET m | GET members | k ;
+        IF eq | MAP_GET m | "id" | member_id | {
+            VAR curr_fine | real ;
+            SET curr_fine | AS(MAP_GET m | "fine", real) ;
+            SET curr_fine | CALC sub | curr_fine | amount ;
+            IF lt | curr_fine | 0.0 | { SET curr_fine | 0.0 ; } ;
+            MAP_SET m | "fine" | CALL real_to_str | curr_fine ;
+            CALL log | "info" | STR_JOIN "" | "会员 " | member_id | " 缴纳罚款 ￥" | CALL real_to_str | amount ;
+            RET "OK" ;
+        } ;
+    } ;
+    RET "NOT_FOUND" ;
+} ;
+
+FUNC list_borrows | member_id | str | nil | {
+    VAR title_str | str ;
+    SET title_str | STR_JOIN "" | "借阅记录: " | member_id ;
+    CALL divider | title_str ;
+    VAR found | int ;
+    SET found | 0 ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | borrow_count | 1 | 1 | {
+        VAR br | map[str,str] ;
+        SET br | GET borrows | i ;
+        IF eq | MAP_GET br | "member_id" | member_id | {
+            PRINT "  ID:" | MAP_GET br | "id" | " ISBN:" | MAP_GET br | "isbn"
+                  | " 借:" | MAP_GET br | "borrow_date" | " 到期:" | MAP_GET br | "due_date"
+                  | " 状态:" | MAP_GET br | "status" ;
+            SET found | CALC add | found | 1 ;
+        } ;
+    } ;
+    IF eq | found | 0 | {
+        PRINT "  无借阅记录" ;
+    } | {
+        PRINT "  共 " | found | " 条记录" ;
+    } ;
+} ;
+
+FUNC list_all_active_borrows | nil | {
+    CALL divider | "当前在借" ;
+    VAR found | int ;
+    SET found | 0 ;
+    VAR i | int ;
+    VAR today | str ;
+    SET today | CALL today_str ;
+    VAR today_days | int ;
+    SET today_days | CALL date_to_days | today ;
+
+    LOOP i | 0 | CALC sub | borrow_count | 1 | 1 | {
+        VAR br | map[str,str] ;
+        SET br | GET borrows | i ;
+        IF eq | MAP_GET br | "status" | "active" | {
+            VAR due | str ;
+            SET due | MAP_GET br | "due_date" ;
+            VAR due_d | int ;
+            SET due_d | CALL date_to_days | due ;
+            VAR remain | int ;
+            SET remain | CALC sub | due_d | today_days ;
+            VAR status_flag | str ;
+            SET status_flag | "正常" ;
+            IF lt | remain | 0 | { SET status_flag | "!!逾期!!" ; } ;
+
+            PRINT "  ID:" | MAP_GET br | "id" | " 会员:" | MAP_GET br | "member_id"
+                  | " ISBN:" | MAP_GET br | "isbn" | " 到期:" | due
+                  | " 剩余:" | remain | "天 " | status_flag ;
+            SET found | CALC add | found | 1 ;
+        } ;
+    } ;
+    IF eq | found | 0 | {
+        PRINT "  当前无在借图书" ;
+    } | {
+        PRINT "  共 " | found | " 本在借" ;
+    } ;
+} ;
+
+// ==============================================================
+//  预约管理
+// ==============================================================
+
+FUNC reserve_book | member_id | str | isbn | str | str | {
+    // 检查会员待处理预约数
+    VAR pending | int ;
+    SET pending | 0 ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | reserve_count | 1 | 1 | {
+        VAR r | map[str,str] ;
+        SET r | GET reserves | i ;
+        IF eq | MAP_GET r | "member_id" | member_id | {
+            IF eq | MAP_GET r | "status" | "pending" | {
+                SET pending | CALC add | pending | 1 ;
+            } ;
+        } ;
+    } ;
+    IF ge | pending | MAX_RESERVE | {
+        CALL log | "warn" | STR_JOIN "" | "会员 " | member_id | " 预约已达上限" ;
+        RET "MAX_RESERVE" ;
+    } ;
+
+    // 创建预约记录
+    VAR reserve | map[str,str] ;
+    MAP_SET reserve | "id" | CALL int_to_str | reserve_id_counter ;
+    MAP_SET reserve | "member_id" | member_id ;
+    MAP_SET reserve | "isbn" | isbn ;
+    MAP_SET reserve | "reserve_date" | CALL today_str ;
+    MAP_SET reserve | "status" | "pending" ;
+    MAP_SET reserve | "notify_date" | "-" ;
+
+    PUSH reserves | reserve ;
+    SET reserve_count | CALC add | reserve_count | 1 ;
+    SET reserve_id_counter | CALC add | reserve_id_counter | 1 ;
+
+    CALL log | "info" | STR_JOIN "" | "预约成功: 会员 " | member_id | " → " | isbn ;
+    RET CALL int_to_str | reserve_id_counter ;
+} ;
+
+FUNC list_reserves | nil | {
+    CALL divider | "预约列表" ;
+    IF eq | reserve_count | 0 | {
+        PRINT "  (暂无预约)" ; RET ;
+    } ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | reserve_count | 1 | 1 | {
+        VAR r | map[str,str] ;
+        SET r | GET reserves | i ;
+        PRINT "  ID:" | MAP_GET r | "id" | " 会员:" | MAP_GET r | "member_id"
+              | " ISBN:" | MAP_GET r | "isbn" | " 状态:" | MAP_GET r | "status" ;
+    } ;
+} ;
+
+// ==============================================================
+//  统计与报告
+// ==============================================================
+
+FUNC library_stats | nil | {
+    CALL divider | "图书馆统计" ;
+
+    PRINT "  ┌──── 馆藏概览 ────" ;
+    PRINT "  │ 图书总数: " | book_count | " 种" ;
+
+    VAR total_copies | int ;
+    SET total_copies | 0 ;
+    VAR total_avail | int ;
+    SET total_avail | 0 ;
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | i ;
+        SET total_copies | CALC add | total_copies | AS(MAP_GET b | "total", int) ;
+        SET total_avail | CALC add | total_avail | AS(MAP_GET b | "available", int) ;
+    } ;
+    VAR borrowed_out | int ;
+    SET borrowed_out | CALC sub | total_copies | total_avail ;
+
+    PRINT "  │ 总册数: " | total_copies ;
+    PRINT "  │ 在馆: " | total_avail | " | 借出: " | borrowed_out ;
+    PRINT "  │ 在借率: " | CALC div | CALC mul | borrowed_out | 100 | total_copies | "%" ;
+    PRINT "  │ 会员总数: " | member_count ;
+    PRINT "  │ 总借阅次数: " | borrow_count ;
+    PRINT "  │ 待处理预约: " | reserve_count ;
+
+    // 欠费统计
+    VAR total_fine | real ;
+    SET total_fine | 0.0 ;
+    VAR j | int ;
+    LOOP j | 0 | CALC sub | member_count | 1 | 1 | {
+        VAR m | map[str,str] ;
+        SET m | GET members | j ;
+        SET total_fine | CALC add | total_fine | AS(MAP_GET m | "fine", real) ;
+    } ;
+    PRINT "  │ 总欠费: ￥" | CALL real_to_str | total_fine ;
+    PRINT "  └──────────────────" ;
+} ;
+
+FUNC popular_books | nil | {
+    CALL divider | "热门图书" ;
+    // 按借阅次数简单统计
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | i ;
+        VAR isbn | str ;
+        SET isbn | MAP_GET b | "isbn" ;
+        VAR count | int ;
+        SET count | 0 ;
+        VAR j | int ;
+        LOOP j | 0 | CALC sub | borrow_count | 1 | 1 | {
+            VAR br | map[str,str] ;
+            SET br | GET borrows | j ;
+            IF eq | MAP_GET br | "isbn" | isbn | {
+                SET count | CALC add | count | 1 ;
+            } ;
+        } ;
+        PRINT "  " | MAP_GET b | "title" | " (" | isbn | ") — 借阅 " | count | " 次" ;
+    } ;
+} ;
+
+FUNC overdue_report | nil | {
+    CALL divider | "逾期报告" ;
+    VAR today | str ;
+    SET today | CALL today_str ;
+    VAR td | int ;
+    SET td | CALL date_to_days | today ;
+    VAR found | int ;
+    SET found | 0 ;
+
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | borrow_count | 1 | 1 | {
+        VAR br | map[str,str] ;
+        SET br | GET borrows | i ;
+        IF eq | MAP_GET br | "status" | "active" | {
+            VAR due | str ;
+            SET due | MAP_GET br | "due_date" ;
+            VAR dd | int ;
+            SET dd | CALL date_to_days | due ;
+            VAR overdue | int ;
+            SET overdue | CALC sub | td | dd ;
+            IF gt | overdue | 0 | {
+                PRINT "  !! 借阅ID:" | MAP_GET br | "id" | " 会员:" | MAP_GET br | "member_id"
+                      | " ISBN:" | MAP_GET br | "isbn" | " 逾期" | overdue | "天" ;
+                SET found | CALC add | found | 1 ;
+            } ;
+        } ;
+    } ;
+    IF eq | found | 0 | {
+        PRINT "  (无逾期)" ;
+    } | {
+        PRINT "  共 " | found | " 笔逾期" ;
+    } ;
+} ;
+
+// ==============================================================
+//  文件持久化
+// ==============================================================
+
+FUNC save_data | filepath | str | str | {
+    CALL log | "info" | STR_JOIN "" | "保存数据到 " | filepath ;
+
+    VAR content | str ;
+    SET content | "DKLIBRARY_DATA v1.0\n---BOOKS---\n" ;
+
+    VAR i | int ;
+    LOOP i | 0 | CALC sub | book_count | 1 | 1 | {
+        VAR b | map[str,str] ;
+        SET b | GET books | i ;
+        VAR line | str ;
+        SET line | STR_JOIN "|" | MAP_GET b | "isbn" | MAP_GET b | "title"
+                  | MAP_GET b | "author" | MAP_GET b | "category" | MAP_GET b | "year"
+                  | MAP_GET b | "total" | MAP_GET b | "available" | MAP_GET b | "location" ;
+        SET content | STR_JOIN "" | content | line | "\n" ;
+    } ;
+
+    SET content | STR_JOIN "" | content | "---MEMBERS---\n" ;
+    VAR j | int ;
+    LOOP j | 0 | CALC sub | member_count | 1 | 1 | {
+        VAR m | map[str,str] ;
+        SET m | GET members | j ;
+        VAR line | str ;
+        SET line | STR_JOIN "|" | MAP_GET m | "id" | MAP_GET m | "name"
+                  | MAP_GET m | "phone" | MAP_GET m | "email" | MAP_GET m | "type"
+                  | MAP_GET m | "join_date" | MAP_GET m | "borrowed_count" | MAP_GET m | "fine" ;
+        SET content | STR_JOIN "" | content | line | "\n" ;
+    } ;
+
+    SET content | STR_JOIN "" | content | "---BORROWS---\n" ;
+    VAR k | int ;
+    LOOP k | 0 | CALC sub | borrow_count | 1 | 1 | {
+        VAR br | map[str,str] ;
+        SET br | GET borrows | k ;
+        VAR line | str ;
+        SET line | STR_JOIN "|" | MAP_GET br | "id" | MAP_GET br | "member_id"
+                  | MAP_GET br | "isbn" | MAP_GET br | "borrow_date" | MAP_GET br | "due_date"
+                  | MAP_GET br | "return_date" | MAP_GET br | "status" ;
+        SET content | STR_JOIN "" | content | line | "\n" ;
+    } ;
+
+    FILE_WRITE filepath | content ;
+    CALL log | "info" | "数据保存完成" ;
+    RET "OK" ;
+} ;
+
+FUNC load_data | filepath | str | str | {
+    VAR exists | bool ;
+    FILE_EXIST exists | filepath ;
+    IF eq | exists | false | {
+        CALL log | "warn" | STR_JOIN "" | "数据文件不存在: " | filepath ;
+        RET "NOT_FOUND" ;
+    } ;
+
+    VAR raw | str ;
+    FILE_READ raw | filepath ;
+    VAR preview | str ;
+    STR_CUT preview | raw | 0 | 150 ;
+    PRINT "  读取文件: " | filepath ;
+    PRINT "  前150字符:" ;
+    PRINT "  " | preview ;
+    RET "OK" ;
+} ;
+
+// ==============================================================
+//  主程序
+// ==============================================================
+
+FUNC main | nil | {
+    PRINT "" ;
+    PRINT "╔══════════════════════════════════════════════════╗" ;
+    PRINT "║     [Book] 图 书 借 阅 管 理 系 统  v1.0        ║" ;
+    PRINT "║     DK-Lang 中大型项目压测                       ║" ;
+    PRINT "╚══════════════════════════════════════════════════╝" ;
+
+    // ─── 1. 添加图书 ───
+    CALL divider | "1. 初始化馆藏" ;
+    CALL add_book | "978-7-01" | "红楼梦" | "曹雪芹" | "古典文学" | 2019 | 5 | "A区-1架" ;
+    CALL add_book | "978-7-02" | "三国演义" | "罗贯中" | "古典文学" | 2020 | 3 | "A区-2架" ;
+    CALL add_book | "978-7-03" | "百年孤独" | "马尔克斯" | "外国文学" | 2018 | 4 | "B区-1架" ;
+    CALL add_book | "978-7-04" | "算法导论" | "Cormen" | "计算机" | 2021 | 6 | "C区-1架" ;
+    CALL add_book | "978-7-05" | "深入理解计算机系统" | "Bryant" | "计算机" | 2022 | 3 | "C区-2架" ;
+    CALL add_book | "978-7-06" | "设计模式" | "GoF" | "计算机" | 2020 | 4 | "C区-3架" ;
+    CALL add_book | "978-7-07" | "活着" | "余华" | "现代文学" | 2019 | 5 | "A区-3架" ;
+    CALL add_book | "978-7-08" | "围城" | "钱钟书" | "现代文学" | 2020 | 3 | "A区-4架" ;
+    CALL add_book | "978-7-09" | "经济学原理" | "曼昆" | "经济管理" | 2021 | 4 | "D区-1架" ;
+    CALL add_book | "978-7-10" | "时间简史" | "霍金" | "自然科学" | 2018 | 3 | "E区-1架" ;
+    CALL list_books ;
+
+    // ─── 2. 注册会员 ───
+    CALL divider | "2. 注册会员" ;
+    CALL add_member | "M001" | "张三" | "13800001111" | "zhangsan@mail.com" | "学生" ;
+    CALL add_member | "M002" | "李四" | "13800002222" | "lisi@mail.com" | "教师" ;
+    CALL add_member | "M003" | "王五" | "13800003333" | "wangwu@mail.com" | "学生" ;
+    CALL add_member | "M004" | "赵六" | "13800004444" | "zhaoliu@mail.com" | "学生" ;
+    CALL add_member | "M005" | "孙七" | "13800005555" | "sunqi@mail.com" | "教师" ;
+    CALL list_members ;
+
+    // ─── 3. 借阅操作 ───
+    CALL divider | "3. 借阅操作" ;
+    // 张三借 3 本
+    CALL borrow_book | "M001" | "978-7-01" ;
+    CALL borrow_book | "M001" | "978-7-04" ;
+    CALL borrow_book | "M001" | "978-7-06" ;
+    // 李四借 2 本
+    CALL borrow_book | "M002" | "978-7-02" ;
+    CALL borrow_book | "M002" | "978-7-05" ;
+    // 王五借 1 本
+    CALL borrow_book | "M003" | "978-7-07" ;
+    // 赵六借 4 本
+    CALL borrow_book | "M004" | "978-7-03" ;
+    CALL borrow_book | "M004" | "978-7-08" ;
+    CALL borrow_book | "M004" | "978-7-09" ;
+    CALL borrow_book | "M004" | "978-7-10" ;
+
+    CALL list_all_active_borrows ;
+
+    // ─── 4. 归还操作（含逾期） ──
+    CALL divider | "4. 归还操作" ;
+    // 模拟：手动调日期检查逻辑 —— 正常归还 Borrow#1000 (借了红楼梦)
+    // 这里用已生成的 borrow_id。由于刚借的不会逾期，归还演示正常流程
+    CALL return_book | "1000" ;  // 张三还红楼梦
+    CALL return_book | "1001" ;  // 张三还算法导论
+
+    // ─── 5. 预约操作 ──
+    CALL divider | "5. 预约操作" ;
+    CALL reserve_book | "M005" | "978-7-01" ;  // 预约红楼梦
+    CALL reserve_book | "M005" | "978-7-04" ;  // 预约算法导论
+    CALL list_reserves ;
+
+    // ─── 6. 搜索图书 ──
+    CALL divider | "6. 搜索图书" ;
+    CALL search_books | "计算机" ;
+    CALL search_books | "文学" ;
+
+    // ─── 7. 借阅记录 ──
+    CALL divider | "7. 借阅记录" ;
+    CALL list_borrows | "M001" ;
+    CALL list_borrows | "M004" ;
+
+    // ─── 8. 逾期/在借状态 ──
+    CALL divider | "8. 当前状态" ;
+    CALL list_all_active_borrows ;
+    CALL overdue_report ;
+
+    // ─── 9. 罚款处理 ──
+    CALL divider | "9. 罚款处理" ;
+    CALL pay_fine | "M001" | 2.5 ;
+
+    // ─── 10. 统计数据 ──
+    CALL divider | "10. 图书馆统计" ;
+    CALL library_stats ;
+    CALL popular_books ;
+
+    // ─── 11. 分类展示 ──
+    CALL divider | "11. 分类" ;
+    CALL list_categories ;
+
+    // ─── 12. 数据持久化 ──
+    CALL divider | "12. 数据持久化" ;
+    CALL save_data | "./library_data.txt" ;
+    CALL load_data | "./library_data.txt" ;
+
+    // ─── 完成 ──
+    PRINT "" ;
+    PRINT "╔══════════════════════════════════════════════════╗" ;
+    PRINT "║     [OK] 图书管理系统演示完成！                    ║" ;
+    PRINT "╚══════════════════════════════════════════════════╝" ;
+} ;
+
+CALL main ;

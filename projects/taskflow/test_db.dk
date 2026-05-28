@@ -1,0 +1,32 @@
+VERSION "1.0.0" ;
+
+// 测试 DB 扩展
+FUNC log | level | str | msg | str | nil | {
+    PRINT "[" | level | "] " | msg ;
+} ;
+
+FUNC main | str | {
+    CALL log | "info" | "测试 DB 扩展" ;
+
+    // 连接数据库
+    CALL _db_connect | "testdb" | "sqlite" | "sqlite://./test_taskflow.db" ;
+    CALL log | "info" | "DB 已连接" ;
+
+    // 创建表
+    CALL _db_execute | "testdb" | "CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY, name TEXT)" | "{}" ;
+    CALL log | "info" | "表已创建" ;
+
+    // 插入
+    CALL _db_execute | "testdb" | "INSERT INTO test (name) VALUES ('hello')" | "{}" ;
+    CALL log | "info" | "数据已插入" ;
+
+    // 查询
+    VAR result | str ;
+    SET result | CALL _db_execute | "testdb" | "SELECT * FROM test" | "{}" ;
+    PRINT "查询结果类型:" | CALL typeof | result ;
+
+    CALL log | "info" | "测试完成！" ;
+    RET "OK" ;
+} ;
+
+CALL main ;

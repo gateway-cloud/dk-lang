@@ -1,0 +1,32 @@
+VERSION "1.0.0" ;
+PERMIT "file_read" ;
+PERMIT "file_write" ;
+
+// DK-Lang 示例5：工程化 — 文件 + 异常 + 类型转换
+
+// 文件写入
+FILE_WRITE "./test_output.txt" | "Hello from DK-Lang!" ;
+
+// 文件读取
+VAR data | str ;
+FILE_READ data | "./test_output.txt" ;
+PRINT "读取内容:" | data ;
+
+// 异常处理
+TRY | {
+    VAR bad | str ;
+    FILE_READ bad | "./nonexistent.txt" ;
+    PRINT bad ;
+} CATCH "IOError" | {
+    PRINT "文件不存在，已捕获异常" ;
+} ;
+
+// 类型转换
+VAR pi | real ;
+SET pi | 3.14 ;
+VAR pi_int | int ;
+SET pi_int | AS(pi, int) ;
+PRINT "pi 转 int:" | pi_int ;
+
+// 日志
+LOG "info" | "程序执行完毕" ;

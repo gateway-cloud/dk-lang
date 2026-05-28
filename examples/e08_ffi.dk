@@ -1,0 +1,16 @@
+VERSION "1.0.0" ;
+
+// DK-Lang FFI 测试 — Python math 库
+
+from "python" import "math" as m ;
+
+VAR val | real ;
+SET val | 3.14 ;
+
+VAR sin_result | real ;
+SET sin_result | m.sin | val ;
+PRINT "math.sin(3.14) =" | sin_result ;
+
+VAR sqrt_result | real ;
+SET sqrt_result | m.sqrt | 16 ;
+PRINT "math.sqrt(16) =" | sqrt_result ;

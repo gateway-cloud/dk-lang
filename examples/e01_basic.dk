@@ -1,0 +1,19 @@
+VERSION "1.0.0" ;
+
+// DK-Lang 示例1：基础入门 — 变量、运算、输出
+
+VAR name | str ;
+VAR score | int ;
+VAR rate | real ;
+
+SET name | "DeepSeek" ;
+SET score | 95 ;
+SET rate | 0.85 ;
+
+PRINT "Hello," | name ;
+PRINT "分数:" | score ;
+PRINT "得分率:" | CALC mul | rate | 100 | " %" ;
+
+VAR sum | int ;
+SET sum | CALC add | score | 5 ;
+PRINT "加分后:" | sum ;

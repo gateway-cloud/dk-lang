@@ -1,0 +1,34 @@
+VERSION "1.0.0" ;
+PERMIT "ai_call" ;
+PERMIT "file_read" ;
+
+// DK-Lang 示例6：AI 原生能力演示
+
+// 读取文件
+VAR article | str ;
+SET article | "DK-Lang is a programming language designed for DeepSeek. It uses pipe-delimited syntax for zero-ambiguity parsing. The language has 90+ keywords organized in 13 capability layers." ;
+
+// AI 问答
+VAR answer | str ;
+AI_ASK answer | "What is DK-Lang?" | "You are a technical expert" ;
+PRINT "AI回答:" | answer ;
+
+// 文本摘要
+VAR summary | str ;
+AI_SUMMARIZE summary | article | 30 ;
+PRINT "摘要:" | summary ;
+
+// 文本分类
+VAR category | str ;
+AI_CLASSIFY category | article | "Tech" | "Sports" | "Music" ;
+PRINT "分类:" | category ;
+
+// 关键词提取
+VAR keywords | str ;
+AI_EXTRACT keywords | "keywords" | article ;
+PRINT "关键词:" | keywords ;
+
+// 翻译
+VAR translated | str ;
+AI_TRANSLATE translated | "你好世界" | "en" ;
+PRINT "翻译:" | translated ;

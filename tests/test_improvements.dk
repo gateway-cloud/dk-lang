@@ -1,0 +1,40 @@
+VERSION "1.0.0" ;
+
+// 测试1: STR_JOIN 表达式（在 SET 和 CALL 中内联）
+VAR msg | str ;
+SET msg | STR_JOIN "" | "Hello, " | "DK-Lang" | "!" ;
+PRINT "STR_JOIN expr:" | msg ;
+
+// 测试2: STR_JOIN 在 CALL 参数中
+FUNC greet | name | str | str | { RET STR_JOIN "" | "Hi " | name | "!" ; } ;
+PRINT CALL greet | "World" ;
+
+// 测试3: STR_LEN 表达式
+VAR num | int ;
+ARR_LEN num | msg ;
+PRINT "STR_LEN of msg:" | num ;
+
+// 测试4: ARR_LEN 表达式
+ARR scores | int | 95 | 87 | 73 | 88 | 91 ;
+VAR count | int ;
+SET count | ARR_LEN scores ;
+PRINT "ARR_LEN scores:" | count ;
+
+// 测试5: TRY/CATCH 捕获 IndexError
+VAR safe | int ;
+SET safe | 0 ;
+TRY | {
+    VAR bad | int ;
+    SET bad | GET scores | 99 ;
+} CATCH "Error" | {
+    SET safe | 1 ;
+    PRINT "IndexError caught!" ;
+} ;
+PRINT "safe=" | safe ;
+
+// 测试6: TIME 格式化
+VAR ts | str ;
+TIME ts | "YYYY-MM-DD HH:mm:ss" ;
+PRINT "Time:" | ts ;
+
+PRINT "=== All tests passed! ===" ;

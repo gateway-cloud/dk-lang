@@ -1,0 +1,137 @@
+VERSION "1.0.0" ;
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  TaskFlow v2.0 — 纯 DK-Lang 全栈 Web 应用                ║
+// ║  SERVER + ROUTE + MIDDLEWARE + STATIC + DB              ║
+// ╚══════════════════════════════════════════════════════════╝
+
+FUNC log | level | str | msg | str | nil | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    PRINT "[" | ts | " " | level | "] " | msg ;
+} ;
+
+// ══════════════════════════════════════════════════════════
+//  API Handler
+// ══════════════════════════════════════════════════════════
+
+FUNC health | req | str | str | {
+    RET `{"status":"ok","service":"TaskFlow v2.0","runtime":"DK-Lang Native"}` ;
+} ;
+
+FUNC dashboard | req | str | str | {
+    RET `{"tasks":{"total":6,"in_progress":2,"done":1,"urgent":1}}` ;
+} ;
+
+FUNC get_tasks | req | str | str | {
+    VAR result | str ;
+    // 用扩展函数查询
+    CALL _db_connect | "main" | "sqlite" | "sqlite://./taskflow_v2.db" ;
+
+    // 建表
+    CALL _db_execute | "main" | "CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, status TEXT, priority INTEGER)" | "{}" ;
+
+    // 种子数据
+    CALL _db_execute | "main" | "INSERT OR IGNORE INTO tasks (id,title,status,priority) VALUES (1,'完成需求文档','in_progress',4)" | "{}" ;
+    CALL _db_execute | "main" | "INSERT OR IGNORE INTO tasks (id,title,status,priority) VALUES (2,'修复Bug','todo',3)" | "{}" ;
+    CALL _db_execute | "main" | "INSERT OR IGNORE INTO tasks (id,title,status,priority) VALUES (3,'学习DK-Lang','in_progress',2)" | "{}" ;
+
+    SET result | CALL _db_execute | "main" | "SELECT * FROM tasks" | "{}" ;
+    RET result ;
+} ;
+
+FUNC create_task | req | str | str | {
+    RET `{"status":"created","id":99}` ;
+} ;
+
+// ══════════════════════════════════════════════════════════
+//  认证中间件
+// ══════════════════════════════════════════════════════════
+
+FUNC auth_mw | req | str | str | {
+    // 简单 token 检查
+    VAR token | str ;
+    SET token | STR_CUT req | 0 | 4 ;
+    // 开发模式：总是通过
+    RET "OK" ;
+} ;
+
+// ══════════════════════════════════════════════════════════
+//  生成前端
+// ══════════════════════════════════════════════════════════
+
+FUNC gen_frontend | str | {
+    VAR html | str ;
+    SET html | `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TaskFlow v2.0 - DK-Lang Native</title>
+<style>
+:root{--p:#6366f1;--bg:#f8fafc;--card:#fff;--t:#1e293b;--t2:#64748b;--b:#e2e8f0;--r:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--t);padding:32px;max-width:800px;margin:0 auto}
+h1{color:var(--p);margin-bottom:8px}
+.sub{color:var(--t2);font-size:.85rem;margin-bottom:24px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);text-align:center}
+.card .v{font-size:1.75rem;font-weight:700;color:var(--p)}
+.card .l{color:var(--t2);font-size:.78rem;margin-top:4px}
+.task{background:var(--card);border-radius:var(--r);padding:14px 18px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:center;gap:10px}
+.task .dot{width:8px;height:8px;border-radius:50%}
+.task .dot.todo{background:#f59e0b}.task .dot.progress{background:#3b82f6}.task .dot.done{background:#10b981}
+.task .info{flex:1}
+.task .info .title{font-weight:500}
+.task .info .meta{font-size:.78rem;color:var(--t2)}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<h1>TaskFlow v2.0</h1>
+<p class="sub">Powered by DK-Lang Native Server</p>
+<div class="stats">
+<div class="card"><div class="v" id="v1">-</div><div class="l">总任务</div></div>
+<div class="card"><div class="v" id="v2">-</div><div class="l">进行中</div></div>
+<div class="card"><div class="v" id="v3">-</div><div class="l">已完成</div></div>
+<div class="card"><div class="v" id="v4">-</div><div class="l">紧急</div></div>
+</div>
+<div id="list"></div>
+<script>
+async function load(){try{const r=await fetch('/api/tasks');const t=await r.json();const cs={todo:'todo',in_progress:'progress',done:'done'};document.getElementById('list').innerHTML=t.map(x=>'<div class="task"><div class="dot '+cs[x.status]+'"></div><div class="info"><div class="title">'+x.title+'</div><div class="meta">状态:'+x.status+' | 优先级:'+x.priority+'</div></div></div>').join('');document.getElementById('v1').textContent=t.length;document.getElementById('v2').textContent=t.filter(x=>x.status==='in_progress').length;document.getElementById('v3').textContent=t.filter(x=>x.status==='done').length;document.getElementById('v4').textContent=t.filter(x=>x.priority>=3).length}catch(e){document.getElementById('list').innerHTML='<div style="text-align:center;padding:40px;color:var(--t2)">加载中...</div>'}setTimeout(load,5000)}load();
+</script>
+</body>
+</html>
+` ;
+    FILE_WRITE "./static/index.html" | html ;
+    RET "OK" ;
+} ;
+
+FUNC index_page | req | str | str | {
+    VAR html | str ;
+    FILE_READ html | "./static/index.html" ;
+    RET html ;
+} ;
+
+// ══════════════════════════════════════════════════════════
+
+FUNC main | str | {
+    CALL log | "info" | "TaskFlow v2.0 启动 (DK-Lang Native Server)" ;
+    CALL gen_frontend ;
+    CALL log | "info" | "前端已生成" ;
+    CALL log | "info" | "HTTP 服务器启动: http://localhost:8088" ;
+
+    SERVER "0.0.0.0" | 8089 | {
+        STATIC "/static" | "./static" ;
+        MIDDLEWARE auth_mw ;
+        ROUTE "GET" | "/" | index_page ;
+        ROUTE "GET" | "/api/health" | health ;
+        ROUTE "GET" | "/api/dashboard" | dashboard ;
+        ROUTE "GET" | "/api/tasks" | get_tasks ;
+        ROUTE "POST" | "/api/tasks" | create_task ;
+    } ;
+
+    RET "OK" ;
+} ;
+
+CALL main ;

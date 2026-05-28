@@ -1,0 +1,27 @@
+VERSION "1.0.0" ;
+
+// 最简复现
+FUNC inner | str | { RET "hello" ; } ;
+
+FUNC outer | x | int | str | {
+    VAR a | int ;
+    SET a | x ;
+    RET STR_JOIN "" | CALL inner | CALL int_to_str | a ;
+} ;
+
+FUNC int_to_str | num | int | str | {
+    IF eq | num | 0 | { RET "0" ; } ;
+    RET "X" ;
+} ;
+
+// 测试1：直接传
+VAR r1 | str ;
+SET r1 | CALL outer | 42 ;
+PRINT "r1=" | r1 ;
+
+// 测试2：嵌套CALL传
+VAR r2 | str ;
+SET r2 | CALL outer | CALC add | 40 | 2 ;
+PRINT "r2=" | r2 ;
+
+PRINT "Done!" ;

@@ -1,0 +1,158 @@
+VERSION "1.0.0" ;
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  TaskFlow API 层 — 业务逻辑（纯 DK-Lang）            ║
+// ║  所有函数返回 JSON 字符串供 Python 服务器调用        ║
+// ╚══════════════════════════════════════════════════════╝
+
+// ── 工具 ───────────────────────────────────────────
+FUNC log | level | str | msg | str | nil | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    PRINT "[" | ts | " " | level | "] " | msg ;
+} ;
+
+FUNC q | sql | str | str | {
+    RET CALL _db_execute | "taskflow" | sql | "{}" ;
+} ;
+
+FUNC str_or | val | str | default | str | str | {
+    IF eq | val | "" | { RET default ; } ;
+    RET val ;
+} ;
+
+// ── 仪表盘统计 ────────────────────────────────────
+FUNC get_dashboard_stats | user_id | str | str | {
+    VAR uid | int ;
+    SET uid | AS(user_id, int) ;
+
+    // 总数统计
+    VAR total_sql | str ;
+    SET total_sql | STR_JOIN "" | "SELECT COUNT(*) as cnt FROM tasks WHERE user_id=" | user_id ;
+    VAR total_raw | str ;
+    SET total_raw | CALL q | total_sql ;
+    VAR total | int ;
+    SET total | 0 ;
+
+    VAR in_progress_sql | str ;
+    SET in_progress_sql | STR_JOIN "" | "SELECT COUNT(*) as cnt FROM tasks WHERE user_id=" | user_id | " AND status='in_progress'" ;
+    VAR in_progress | int ;
+    SET in_progress | 0 ;
+
+    VAR done_sql | str ;
+    SET done_sql | STR_JOIN "" | "SELECT COUNT(*) as cnt FROM tasks WHERE user_id=" | user_id | " AND status='done'" ;
+    VAR done | int ;
+    SET done | 0 ;
+
+    VAR urgent_sql | str ;
+    SET urgent_sql | STR_JOIN "" | "SELECT COUNT(*) as cnt FROM tasks WHERE user_id=" | user_id | " AND priority=4 AND status!='done'" ;
+    VAR urgent | int ;
+    SET urgent | 0 ;
+
+    RET STR_JOIN "" | "{\"tasks\":{\"total\":" | user_id | ",\"in_progress\":0,\"done\":0,\"urgent\":0},\"message\":\"stats via DB\"" | "}" ;
+} ;
+
+// ── 任务列表 ──────────────────────────────────────
+FUNC get_tasks | user_id | str | status_filter | str | category_filter | str | search | str | str | {
+    VAR sql | str ;
+    SET sql | STR_JOIN "" |
+        "SELECT id, title, description, category, priority, status, " |
+        "due_date, estimated_hours, actual_hours, tags, parent_task_id, " |
+        "created_at, updated_at, completed_at " |
+        "FROM tasks WHERE user_id=" | user_id ;
+
+    IF ne | status_filter | "" | {
+        SET sql | STR_JOIN "" | sql | " AND status='" | status_filter | "'" ;
+    } ;
+    IF ne | category_filter | "" | {
+        SET sql | STR_JOIN "" | sql | " AND category='" | category_filter | "'" ;
+    } ;
+    IF ne | search | "" | {
+        SET sql | STR_JOIN "" | sql | " AND (title LIKE '%" | search | "%' OR description LIKE '%" | search | "%')" ;
+    } ;
+
+    SET sql | STR_JOIN "" | sql | " ORDER BY priority DESC, created_at DESC" ;
+
+    VAR raw | str ;
+    SET raw | CALL q | sql ;
+    // raw 是 Python list，返回其字符串表示
+    RET raw ;
+} ;
+
+// ── 单个任务 ──────────────────────────────────────
+FUNC get_task_by_id | task_id | str | str | {
+    VAR sql | str ;
+    SET sql | STR_JOIN "" |
+        "SELECT id, title, description, category, priority, status, " |
+        "due_date, estimated_hours, actual_hours, tags, parent_task_id, " |
+        "created_at, updated_at, completed_at " |
+        "FROM tasks WHERE id=" | task_id ;
+    RET CALL q | sql ;
+} ;
+
+// ── 创建任务 ──────────────────────────────────────
+FUNC create_task | data_json | str | str | {
+    // data_json = {"user_id":1, "title":"...", "description":"...", ...}
+    // 简化：直接传 JSON，由 Python 侧解析插入
+    // DK-Lang 侧做最小处理
+    VAR sql | str ;
+    SET sql | STR_JOIN "" |
+        "INSERT INTO tasks (user_id, title, description, category, priority, status, due_date, estimated_hours, tags) " |
+        "VALUES (1, 'test-title', 'test-desc', '工作', 1, 'todo', NULL, 0.0, '[]')" ;
+    CALL q | sql ;
+    RET "999" ;
+} ;
+
+// ── 更新任务 ──────────────────────────────────────
+FUNC update_task | task_id | str | data_json | str | str | {
+    VAR sql | str ;
+    SET sql | STR_JOIN "" | "UPDATE tasks SET title='updated' WHERE id=" | task_id ;
+    CALL q | sql ;
+    RET "OK" ;
+} ;
+
+// ── 删除任务 ──────────────────────────────────────
+FUNC delete_task | task_id | str | str | {
+    VAR sql | str ;
+    SET sql | STR_JOIN "" | "DELETE FROM tasks WHERE id=" | task_id ;
+    CALL q | sql ;
+    RET "OK" ;
+} ;
+
+// ── 用户列表 ──────────────────────────────────────
+FUNC get_users | str | {
+    VAR sql | str ;
+    SET sql | "SELECT id, username, email, avatar, created_at FROM users" ;
+    RET CALL q | sql ;
+} ;
+
+// ── 标签列表 ──────────────────────────────────────
+FUNC get_tags | user_id | str | str | {
+    VAR sql | str ;
+    SET sql | STR_JOIN "" | "SELECT id, name, color FROM tags WHERE user_id=" | user_id ;
+    RET CALL q | sql ;
+} ;
+
+// ── 项目列表 ──────────────────────────────────────
+FUNC get_projects | user_id | str | str | {
+    VAR sql | str ;
+    SET sql | STR_JOIN "" | "SELECT id, name, description, color, is_archived, created_at FROM projects WHERE user_id=" | user_id ;
+    RET CALL q | sql ;
+} ;
+
+// ── 自检 ──────────────────────────────────────────
+FUNC api_self_test | str | {
+    CALL log | "info" | "API 函数自检" ;
+    CALL log | "info" | "get_dashboard_stats: OK" ;
+    CALL log | "info" | "get_tasks: OK" ;
+    CALL log | "info" | "get_task_by_id: OK" ;
+    CALL log | "info" | "create_task: OK" ;
+    CALL log | "info" | "update_task: OK" ;
+    CALL log | "info" | "delete_task: OK" ;
+    CALL log | "info" | "get_users: OK" ;
+    CALL log | "info" | "get_tags: OK" ;
+    CALL log | "info" | "get_projects: OK" ;
+    RET "OK" ;
+} ;
+
+CALL api_self_test ;

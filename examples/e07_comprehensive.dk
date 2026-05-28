@@ -1,0 +1,85 @@
+VERSION "1.0.0" ;
+PERMIT "file_read" ;
+PERMIT "file_write" ;
+
+// ═══════════════════════════════════════════
+// DK-Lang 示例7：综合大型案例
+// ═══════════════════════════════════════════
+
+FUNC log | level | str | msg | str | nil | {
+    VAR ts | str ;
+    TIME ts | "HH:mm:ss" ;
+    PRINT "[ " | ts | " " | level | " ] " | msg ;
+} ;
+
+FUNC max_val | a | int | b | int | int | {
+    IF gt | a | b | { RET a ; } ;
+    RET b ;
+} ;
+
+FUNC main | nil | {
+    LOG "info" | "程序启动" ;
+
+    // 定义测试数据
+    ARR scores | int | 95 | 87 | 73 | 88 | 91 | 60 | 78 | 85 | 92 | 99 ;
+    VAR n | int ;
+    SET n | 10 ;
+
+    // 计算平均
+    VAR sum | int ;
+    SET sum | 0 ;
+    VAR i | int ;
+    LOOP i | 0 | 9 | 1 | {
+        SET sum | CALC add | sum | GET scores | i ;
+    } ;
+    VAR avg | real ;
+    SET avg | CALC div | sum | n ;
+    LOG "info" | "平均分计算完成" ;
+
+    // 找最高分
+    VAR the_max | int ;
+    SET the_max | GET scores | 0 ;
+    LOOP i | 1 | 9 | 1 | {
+        VAR s | int ;
+        SET s | GET scores | i ;
+        SET the_max | CALL max_val | the_max | s ;
+    } ;
+
+    // 分级统计
+    VAR excellent | int ; VAR good | int ; VAR pass | int ; VAR fail | int ;
+    SET excellent | 0 ; SET good | 0 ; SET pass | 0 ; SET fail | 0 ;
+
+    LOOP i | 0 | 9 | 1 | {
+        VAR s | int ;
+        SET s | GET scores | i ;
+        IF ge | s | 90 | {
+            SET excellent | CALC add | excellent | 1 ;
+        } | {
+            IF ge | s | 80 | {
+                SET good | CALC add | good | 1 ;
+            } | {
+                IF ge | s | 60 | {
+                    SET pass | CALC add | pass | 1 ;
+                } | {
+                    SET fail | CALC add | fail | 1 ;
+                } ;
+            } ;
+        } ;
+    } ;
+
+    // 输出报告
+    PRINT "======== 成绩分析报告 ========" ;
+    PRINT "平均分:" | avg ;
+    PRINT "最高分:" | the_max ;
+    PRINT "优秀(>=90):" | excellent | "人" ;
+    PRINT "良好(80-89):" | good | "人" ;
+    PRINT "及格(60-79):" | pass | "人" ;
+    PRINT "不及格(<60):" | fail | "人" ;
+    PRINT "==============================" ;
+
+    FILE_WRITE "./report.txt" | "DK-Lang 成绩分析报告" ;
+    LOG "info" | "报告已保存" ;
+    LOG "info" | "程序完成" ;
+} ;
+
+CALL main ;

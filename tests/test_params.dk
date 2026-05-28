@@ -1,0 +1,34 @@
+VERSION "1.0.0" ;
+
+// 测试：函数参数中的变量是否可被访问
+FUNC test_params | a | int | b | int | int | {
+    RET CALC add | a | b ;
+} ;
+
+VAR result | int ;
+SET result | CALL test_params | 3 | 5 ;
+PRINT "test_params(3,5) =" | result ;
+
+// 测试：函数名含下划线 + 参数含下划线
+FUNC add_days_to_date | date_str | str | days_to_add | int | str | {
+    VAR d | int ;
+    SET d | days_to_add ;
+    RET date_str ;
+} ;
+
+PRINT CALL add_days_to_date | "2024-01-01" | 30 ;
+
+// 测试：日期比较函数
+FUNC calc_days | y | int | m | int | d | int | int | {
+    SET y | CALC sub | y | 2020 ;
+    VAR days | int ;
+    SET days | CALC mul | y | 365 ;
+    SET days | CALC add | days | CALC mul | m | 30 ;
+    SET days | CALC add | days | d ;
+    RET days ;
+} ;
+
+VAR days_count | int ;
+SET days_count | CALL calc_days | 2026 | 5 | 28 ;
+PRINT "days_count =" | days_count ;
+PRINT "All tests passed!" ;
